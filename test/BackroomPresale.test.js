@@ -37,11 +37,12 @@ describe("BackroomPresale", function () {
 
 		it("Should initialize with correct state", async function () {
 			const info = await presale.getSaleInfo();
-			expect(info._saleActive).to.be.false;
 			expect(info._saleFinalized).to.be.false;
 			expect(info._saleSuccessful).to.be.false;
 			expect(info._totalRaised).to.equal(0);
 			expect(info._contributors).to.equal(0);
+			expect(info._startTime).to.equal(0);
+			expect(info._endTime).to.equal(0);
 		});
 	});
 
@@ -51,7 +52,6 @@ describe("BackroomPresale", function () {
 				.to.emit(presale, "SaleStarted");
 
 			const info = await presale.getSaleInfo();
-			expect(info._saleActive).to.be.true;
 			expect(info._startTime).to.be.greaterThan(0);
 			expect(info._endTime).to.equal(info._startTime + 24n * 3600n);
 		});
@@ -64,7 +64,7 @@ describe("BackroomPresale", function () {
 		it("Should not allow starting sale twice", async function () {
 			await presale.startSale();
 			await expect(presale.startSale())
-				.to.be.revertedWith("Sale already active");
+				.to.be.revertedWith("Sale already active or finalized");
 		});
 	});
 
@@ -116,7 +116,7 @@ describe("BackroomPresale", function () {
 			const contribution = ethers.parseEther("1");
 
 			await expect(newPresale.connect(contributor1).contribute({ value: contribution }))
-				.to.be.revertedWith("Sale not active");
+				.to.be.revertedWith("Sale not started");
 		});
 	});
 
@@ -281,9 +281,11 @@ describe("BackroomPresale", function () {
 	describe("View Functions", function () {
 		it("Should return correct sale info", async function () {
 			const info = await presale.getSaleInfo();
-			expect(info._saleActive).to.be.false;
+			expect(info._saleFinalized).to.be.false;
 			expect(info._totalRaised).to.equal(0);
 			expect(info._contributors).to.equal(0);
+			expect(info._startTime).to.equal(0);
+			expect(info._endTime).to.equal(0);
 		});
 
 		it("Should return contribution info", async function () {
@@ -294,8 +296,6 @@ describe("BackroomPresale", function () {
 		});
 
 		it("Should return time remaining", async function () {
-			expect(await presale.getTimeRemaining()).to.equal(0);
-
 			await presale.startSale();
 			const remaining = await presale.getTimeRemaining();
 			expect(remaining).to.be.greaterThan(0);

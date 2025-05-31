@@ -25,7 +25,6 @@ contract BackroomPresale is Ownable, ReentrancyGuard {
     uint256 public saleStartTime; // When sale begins
     uint256 public saleEndTime; // When sale ends (24h after start)
     uint256 public totalRaised; // Total ETH raised
-    bool public saleActive; // Is sale currently active
     bool public saleFinalized; // Has sale been finalized
     bool public saleSuccessful; // Did sale meet soft cap
 
@@ -39,16 +38,14 @@ contract BackroomPresale is Ownable, ReentrancyGuard {
 
     address[] public contributors; // Array of all contributors
 
-    // Events
     event SaleStarted(uint256 startTime, uint256 endTime);
     event ContributionMade(address indexed contributor, uint256 amount);
     event SaleFinalized(bool successful, uint256 totalRaised);
     event RefundClaimed(address indexed contributor, uint256 amount);
     event FundsWithdrawn(uint256 amount);
 
-    // Modifiers
     modifier onlyDuringSale() {
-        require(saleActive, "Sale not active");
+        require(saleStartTime > 0, "Sale not started");
         require(block.timestamp >= saleStartTime, "Sale not started");
         require(block.timestamp <= saleEndTime, "Sale ended");
         require(totalRaised < hardCap, "Hard cap reached");
@@ -88,10 +85,12 @@ contract BackroomPresale is Ownable, ReentrancyGuard {
      * @dev Start the presale (admin only)
      */
     function startSale() external onlyOwner {
-        require(!saleActive, "Sale already active");
+        require(
+            block.timestamp > saleEndTime || saleStartTime == 0,
+            "Sale already active or finalized"
+        );
         require(!saleFinalized, "Sale already finalized");
 
-        saleActive = true;
         saleStartTime = block.timestamp;
         saleEndTime = block.timestamp + SALE_DURATION;
 
@@ -125,7 +124,6 @@ contract BackroomPresale is Ownable, ReentrancyGuard {
      * @dev Finalize the sale after 24 hours or when hard cap is reached
      */
     function finalizeSale() external {
-        require(saleActive, "Sale not active");
         require(!saleFinalized, "Sale already finalized");
         require(
             block.timestamp > saleEndTime || totalRaised >= hardCap,
@@ -139,7 +137,6 @@ contract BackroomPresale is Ownable, ReentrancyGuard {
      * @dev Internal function to finalize sale
      */
     function _finalizeSale() internal {
-        saleActive = false;
         saleFinalized = true;
         saleSuccessful = totalRaised >= softCap;
 
@@ -185,7 +182,7 @@ contract BackroomPresale is Ownable, ReentrancyGuard {
      */
     function emergencyWithdraw() external onlyOwner {
         require(
-            !saleActive || block.timestamp > saleEndTime + 7 days,
+            !saleFinalized || block.timestamp > saleEndTime + 7 days,
             "Cannot emergency withdraw during active sale"
         );
 
@@ -207,7 +204,6 @@ contract BackroomPresale is Ownable, ReentrancyGuard {
         external
         view
         returns (
-            bool _saleActive,
             bool _saleFinalized,
             bool _saleSuccessful,
             uint256 _totalRaised,
@@ -217,7 +213,6 @@ contract BackroomPresale is Ownable, ReentrancyGuard {
         )
     {
         return (
-            saleActive,
             saleFinalized,
             saleSuccessful,
             totalRaised,
@@ -255,7 +250,7 @@ contract BackroomPresale is Ownable, ReentrancyGuard {
      * @dev Get time remaining in sale
      */
     function getTimeRemaining() external view returns (uint256) {
-        if (!saleActive || block.timestamp >= saleEndTime) {
+        if (saleStartTime == 0 || block.timestamp >= saleEndTime) {
             return 0;
         }
         return saleEndTime - block.timestamp;

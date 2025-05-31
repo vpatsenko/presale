@@ -100,7 +100,7 @@ contract BackroomPresale is Ownable, ReentrancyGuard {
     /**
      * @dev Contribute ETH to the presale
      */
-    function contribute() external payable onlyDuringSale nonReentrant {
+    function deposit() external payable onlyDuringSale nonReentrant {
         require(msg.value >= minContribution, "Below minimum contribution");
         require(!hasContributed[msg.sender], "Already contributed");
         require(msg.value <= maxContribution, "Exceeds maximum contribution");
@@ -177,25 +177,9 @@ contract BackroomPresale is Ownable, ReentrancyGuard {
         emit FundsWithdrawn(amount);
     }
 
-    /**
-     * @dev Emergency withdrawal function (admin only)
-     */
-    function emergencyWithdraw() external onlyOwner {
-        require(
-            !saleFinalized || block.timestamp > saleEndTime + 7 days,
-            "Cannot emergency withdraw during active sale"
-        );
-
-        uint256 amount = address(this).balance;
-        require(amount > 0, "No funds to withdraw");
-
-        (bool success, ) = payable(owner()).call{value: amount}("");
-        require(success, "Emergency withdrawal failed");
-
-        emit FundsWithdrawn(amount);
-    }
-
-    // View Functions
+    // ************************************
+    // ********** View Functions **********
+    // ************************************
 
     /**
      * @dev Get sale status information

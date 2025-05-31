@@ -76,7 +76,7 @@ describe("BackroomPresale", function () {
 		it("Should accept valid contributions", async function () {
 			const contribution = ethers.parseEther("1");
 
-			await expect(presale.connect(contributor1).contribute({ value: contribution }))
+			await expect(presale.connect(contributor1).deposit({ value: contribution }))
 				.to.emit(presale, "ContributionMade")
 				.withArgs(contributor1.address, contribution);
 
@@ -88,23 +88,23 @@ describe("BackroomPresale", function () {
 		it("Should reject contributions below minimum", async function () {
 			const contribution = ethers.parseEther("0.05"); // Below 0.1 ETH minimum
 
-			await expect(presale.connect(contributor1).contribute({ value: contribution }))
+			await expect(presale.connect(contributor1).deposit({ value: contribution }))
 				.to.be.revertedWith("Below minimum contribution");
 		});
 
 		it("Should reject contributions above maximum", async function () {
 			const contribution = ethers.parseEther("6"); // Above 5 ETH maximum
 
-			await expect(presale.connect(contributor1).contribute({ value: contribution }))
+			await expect(presale.connect(contributor1).deposit({ value: contribution }))
 				.to.be.revertedWith("Exceeds maximum contribution");
 		});
 
 		it("Should reject multiple contributions from same address", async function () {
 			const contribution = ethers.parseEther("1");
 
-			await presale.connect(contributor1).contribute({ value: contribution });
+			await presale.connect(contributor1).deposit({ value: contribution });
 
-			await expect(presale.connect(contributor1).contribute({ value: contribution }))
+			await expect(presale.connect(contributor1).deposit({ value: contribution }))
 				.to.be.revertedWith("Already contributed");
 		});
 
@@ -115,7 +115,7 @@ describe("BackroomPresale", function () {
 
 			const contribution = ethers.parseEther("1");
 
-			await expect(newPresale.connect(contributor1).contribute({ value: contribution }))
+			await expect(newPresale.connect(contributor1).deposit({ value: contribution }))
 				.to.be.revertedWith("Sale not started");
 		});
 	});
@@ -127,8 +127,8 @@ describe("BackroomPresale", function () {
 
 		it("Should finalize sale when soft cap is reached after 24 hours", async function () {
 			// Make contributions to reach soft cap
-			await presale.connect(contributor1).contribute({ value: ethers.parseEther("5") });
-			await presale.connect(contributor2).contribute({ value: ethers.parseEther("5") });
+			await presale.connect(contributor1).deposit({ value: ethers.parseEther("5") });
+			await presale.connect(contributor2).deposit({ value: ethers.parseEther("5") });
 
 			// Fast forward 24 hours
 			await ethers.provider.send("evm_increaseTime", [24 * 3600]);
@@ -145,7 +145,7 @@ describe("BackroomPresale", function () {
 
 		it("Should finalize sale as failed when soft cap not reached", async function () {
 			// Make contribution below soft cap
-			await presale.connect(contributor1).contribute({ value: ethers.parseEther("1") });
+			await presale.connect(contributor1).deposit({ value: ethers.parseEther("1") });
 
 			// Fast forward 24 hours
 			await ethers.provider.send("evm_increaseTime", [24 * 3600]);
@@ -168,7 +168,7 @@ describe("BackroomPresale", function () {
 					signer.address,
 					ethers.toBeHex(ethers.parseEther("10"))
 				]);
-				await presale.connect(signer).contribute({ value: ethers.parseEther("5") });
+				await presale.connect(signer).deposit({ value: ethers.parseEther("5") });
 			}
 
 			const info = await presale.getSaleInfo();
@@ -182,7 +182,7 @@ describe("BackroomPresale", function () {
 		beforeEach(async function () {
 			await presale.startSale();
 			// Make contribution below soft cap
-			await presale.connect(contributor1).contribute({ value: ethers.parseEther("1") });
+			await presale.connect(contributor1).deposit({ value: ethers.parseEther("1") });
 
 			// Fast forward and finalize as failed
 			await ethers.provider.send("evm_increaseTime", [24 * 3600]);
@@ -207,8 +207,8 @@ describe("BackroomPresale", function () {
 			await successfulPresale.startSale();
 
 			// Reach soft cap
-			await successfulPresale.connect(contributor1).contribute({ value: ethers.parseEther("5") });
-			await successfulPresale.connect(contributor2).contribute({ value: ethers.parseEther("5") });
+			await successfulPresale.connect(contributor1).deposit({ value: ethers.parseEther("5") });
+			await successfulPresale.connect(contributor2).deposit({ value: ethers.parseEther("5") });
 
 			// Finalize
 			await ethers.provider.send("evm_increaseTime", [24 * 3600]);
@@ -224,8 +224,8 @@ describe("BackroomPresale", function () {
 		beforeEach(async function () {
 			await presale.startSale();
 			// Make successful sale
-			await presale.connect(contributor1).contribute({ value: ethers.parseEther("5") });
-			await presale.connect(contributor2).contribute({ value: ethers.parseEther("5") });
+			await presale.connect(contributor1).deposit({ value: ethers.parseEther("5") });
+			await presale.connect(contributor2).deposit({ value: ethers.parseEther("5") });
 
 			// Fast forward and finalize
 			await ethers.provider.send("evm_increaseTime", [24 * 3600]);
@@ -248,9 +248,9 @@ describe("BackroomPresale", function () {
 	describe("Token Allocation Calculation", function () {
 		beforeEach(async function () {
 			await presale.startSale();
-			await presale.connect(contributor1).contribute({ value: ethers.parseEther("4") });
-			await presale.connect(contributor2).contribute({ value: ethers.parseEther("5") });
-			await presale.connect(contributor3).contribute({ value: ethers.parseEther("1") });
+			await presale.connect(contributor1).deposit({ value: ethers.parseEther("4") });
+			await presale.connect(contributor2).deposit({ value: ethers.parseEther("5") });
+			await presale.connect(contributor3).deposit({ value: ethers.parseEther("1") });
 
 			await ethers.provider.send("evm_increaseTime", [24 * 3600]);
 			await ethers.provider.send("evm_mine", []);

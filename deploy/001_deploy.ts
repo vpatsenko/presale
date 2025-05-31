@@ -1,6 +1,9 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { ethers } from "hardhat";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 	const { deployments, getNamedAccounts } = hre;
@@ -16,11 +19,25 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 	const balance = await deployerSigner.provider.getBalance(deployer);
 	console.log("Account balance:", ethers.formatEther(balance), "ETH");
 
-	// Example parameters for the presale
-	const softCap = ethers.parseEther("10");     // 10 ETH soft cap
-	const hardCap = ethers.parseEther("100");    // 100 ETH hard cap
-	const minContribution = ethers.parseEther("0.1"); // 0.1 ETH minimum
-	const maxContribution = ethers.parseEther("5");   // 5 ETH maximum
+	// Check required environment variables
+	if (!process.env.SOFT_CAP) {
+		throw new Error("SOFT_CAP environment variable is required");
+	}
+	if (!process.env.HARD_CAP) {
+		throw new Error("HARD_CAP environment variable is required");
+	}
+	if (!process.env.MIN_CONTRIBUTION) {
+		throw new Error("MIN_CONTRIBUTION environment variable is required");
+	}
+	if (!process.env.MAX_CONTRIBUTION) {
+		throw new Error("MAX_CONTRIBUTION environment variable is required");
+	}
+
+	// Get parameters from environment variables
+	const softCap = ethers.parseEther(process.env.SOFT_CAP);
+	const hardCap = ethers.parseEther(process.env.HARD_CAP);
+	const minContribution = ethers.parseEther(process.env.MIN_CONTRIBUTION);
+	const maxContribution = ethers.parseEther(process.env.MAX_CONTRIBUTION);
 
 	console.log("Deployment parameters:");
 	console.log("- Soft Cap:", ethers.formatEther(softCap), "ETH");
@@ -43,7 +60,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
 	console.log("BackroomPresale deployed to:", deployment.address);
 	console.log("Deployment transaction hash:", deployment.transactionHash);
-
 
 };
 

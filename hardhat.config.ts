@@ -25,6 +25,30 @@ const config: HardhatUserConfig = {
       default: 0, // here this will by default take the first account as deployer
     },
   },
+  etherscan: {
+    apiKey: {
+      base: process.env.ETHERSCAN_API_KEY || "",
+      baseSepolia: process.env.ETHERSCAN_API_KEY || "",
+    },
+    customChains: [
+      {
+        network: "base",
+        chainId: 8453,
+        urls: {
+          apiURL: "https://api.basescan.org/api",
+          browserURL: "https://basescan.org"
+        }
+      },
+      {
+        network: "baseSepolia",
+        chainId: 84532,
+        urls: {
+          apiURL: "https://api-sepolia.basescan.org/api",
+          browserURL: "https://sepolia.basescan.org"
+        }
+      }
+    ]
+  },
 };
 
 export default config;

@@ -31,31 +31,27 @@ async function main(): Promise<void> {
 
 	console.log("Contract address:", BACKROOM_PRESALE_ADDRESS);
 
-	// Get constructor arguments from environment variables (same as deployment)
-	const constructorArgs = [
-		ethers.parseEther(process.env.SOFT_CAP),        // softCap
-		ethers.parseEther(process.env.HARD_CAP),        // hardCap
-		ethers.parseEther(process.env.MIN_CONTRIBUTION),  // minContribution
-		ethers.parseEther(process.env.MAX_CONTRIBUTION)   // maxContribution
-	];
-
 	console.log("\nConstructor arguments:");
-	console.log("- Soft Cap:", ethers.formatEther(constructorArgs[0]), "ETH");
-	console.log("- Hard Cap:", ethers.formatEther(constructorArgs[1]), "ETH");
-	console.log("- Min Contribution:", ethers.formatEther(constructorArgs[2]), "ETH");
-	console.log("- Max Contribution:", ethers.formatEther(constructorArgs[3]), "ETH");
+	console.log("- Soft Cap:", ethers.formatEther(process.env.SOFT_CAP), "ETH");
+	console.log("- Hard Cap:", ethers.formatEther(process.env.HARD_CAP), "ETH");
+	console.log("- Min Contribution:", ethers.formatEther(process.env.MIN_CONTRIBUTION), "ETH");
+	console.log("- Max Contribution:", ethers.formatEther(process.env.MAX_CONTRIBUTION), "ETH");
 
 	try {
 		console.log("\nStarting verification...");
 
 		await run("verify:verify", {
 			address: BACKROOM_PRESALE_ADDRESS,
-			constructorArguments: constructorArgs,
+			constructorArguments: [
+				process.env.SOFT_CAP,
+				process.env.HARD_CAP,
+				process.env.MIN_CONTRIBUTION,
+				process.env.MAX_CONTRIBUTION
+			],
 		});
 
 		console.log("✅ Contract verified successfully!");
 
-		// Get network info
 		const network = await ethers.provider.getNetwork();
 		console.log(`\n🔗 View on explorer:`);
 

@@ -1,5 +1,18 @@
 const hre = require("hardhat");
 const { ethers } = require("hardhat");
+const { Wallet, utils } = require('ethers');
+const { HDNodeWallet } = require('ethers');
+const { Mnemonic } = require('ethers');
+
+// Import dotenv to access environment variables
+require('dotenv').config();
+
+// Extract the deployer address from the mnemonic
+const deployerMnemonic = process.env.ADMIN_MNEMONIC;
+const deployerWallet = Wallet.fromPhrase(deployerMnemonic);
+const deployerAddress = deployerWallet.address;
+
+console.log("Deployer address from mnemonic:", deployerAddress);
 
 async function main() {
 	console.log("Deploying BackroomPresale contract...");

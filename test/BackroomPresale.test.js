@@ -1,4 +1,5 @@
 const { expect } = require("chai");
+
 const { ethers } = require("hardhat");
 
 describe("BackroomPresale", function () {
@@ -234,9 +235,14 @@ describe("BackroomPresale", function () {
 		});
 
 		it("Should allow owner to withdraw funds from successful sale", async function () {
+			const initialOwnerBalance = await ethers.provider.getBalance(owner.address);
+
 			await expect(presale.withdrawFunds())
 				.to.emit(presale, "FundsWithdrawn")
 				.withArgs(ethers.parseEther("10"));
+
+			const finalOwnerBalance = await ethers.provider.getBalance(owner.address);
+			expect(finalOwnerBalance).to.be.gt(initialOwnerBalance);
 		});
 
 		it("Should not allow non-owner to withdraw funds", async function () {

@@ -7,6 +7,9 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "";
+console.log("ETHERSCAN_API_KEY", ETHERSCAN_API_KEY);
+
 const config: HardhatUserConfig = {
   solidity: "0.8.20",
   networks: {
@@ -26,21 +29,22 @@ const config: HardhatUserConfig = {
     },
   },
   etherscan: {
-    apiKey: process.env.ETHERSCAN_API_KEY || "",
+    apiKey: ETHERSCAN_API_KEY,
     customChains: [
       {
         network: "base",
         chainId: 8453,
         urls: {
-          apiURL: "https://api.basescan.org/api",
+          apiURL: "https://api.etherscan.io/v2/apis",
           browserURL: "https://basescan.org"
         }
       },
       {
+
         network: "baseSepolia",
         chainId: 84532,
         urls: {
-          apiURL: "https://api-sepolia.basescan.org/api",
+          apiURL: "https://api.etherscan.io/v2/api",
           browserURL: "https://sepolia.basescan.org"
         }
       }

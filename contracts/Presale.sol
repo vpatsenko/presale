@@ -7,31 +7,21 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 /**
  * @title BackroomPresale
  * @dev Presale contract for Backroom token with ETH contributions
- * Features:
- * - 24-hour contribution window
- * - One contribution per address
- * - Soft cap / Hard cap mechanics
- * - Min/Max contribution limits
- * - Refund mechanism for failed sales
  */
 contract BackroomPresale is Ownable, ReentrancyGuard {
-    // Sale Parameters
     uint256 public softCap; // Minimum ETH to raise for success
     uint256 public hardCap; // Maximum ETH before early close
     uint256 public minContribution; // Minimum ETH per address
     uint256 public maxContribution; // Maximum ETH per address
 
-    // Sale State
     uint256 public saleStartTime; // When sale begins
     uint256 public saleEndTime; // When sale ends (24h after start)
     uint256 public totalRaised; // Total ETH raised
     bool public saleFinalized; // Has sale been finalized
     bool public saleSuccessful; // Did sale meet soft cap
 
-    // Constants
     uint256 public constant SALE_DURATION = 24 hours;
 
-    // Participant tracking
     mapping(address => uint256) public contributions; // ETH contributed per address
     mapping(address => bool) public hasContributed; // Track if address contributed
     mapping(address => bool) public hasRefunded; // Track refund claims

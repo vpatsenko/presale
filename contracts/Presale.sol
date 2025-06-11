@@ -214,13 +214,6 @@ contract BackroomPresale is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @dev Get all contributors (for off-chain token allocation calculation)
-     */
-    function getContributors() external view returns (address[] memory) {
-        return contributors;
-    }
-
-    /**
      * @dev Get time remaining in sale
      */
     function getTimeRemaining() external view returns (uint256) {

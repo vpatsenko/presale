@@ -9,14 +9,14 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  * @dev Presale contract for Backroom token with ETH contributions
  */
 contract BackroomPresale is Ownable, ReentrancyGuard {
-    uint256 public softCap; // Minimum ETH to raise for success
-    uint256 public hardCap; // Maximum ETH before early close
-    uint256 public minContribution; // Minimum ETH per address
-    uint256 public maxContribution; // Maximum ETH per address
+    uint256 public softCap;
+    uint256 public hardCap;
+    uint256 public minContribution;
+    uint256 public maxContribution;
 
-    uint256 public saleStartTime; // When sale begins
-    uint256 public saleEndTime; // When sale ends (24h after start)
-    uint256 public totalRaised; // Total ETH raised
+    uint256 public saleStartTime;
+    uint256 public saleEndTime;
+    uint256 public totalRaised;
     bool public saleFinalized; // Has sale been finalized
     bool public saleSuccessful; // Did sale meet soft cap
 
@@ -24,9 +24,6 @@ contract BackroomPresale is Ownable, ReentrancyGuard {
 
     mapping(address => uint256) public contributions; // ETH contributed per address
     mapping(address => bool) public hasContributed; // Track if address contributed
-    mapping(address => bool) public hasRefunded; // Track refund claims
-
-    address[] public contributors; // Array of all contributors
 
     event SaleStarted(uint256 startTime, uint256 endTime);
     event ContributionMade(address indexed contributor, uint256 amount);
@@ -96,15 +93,12 @@ contract BackroomPresale is Ownable, ReentrancyGuard {
         require(msg.value <= maxContribution, "Exceeds maximum contribution");
         require(totalRaised + msg.value <= hardCap, "Would exceed hard cap");
 
-        // Record contribution
         contributions[msg.sender] = msg.value;
         hasContributed[msg.sender] = true;
-        contributors.push(msg.sender);
         totalRaised += msg.value;
 
         emit ContributionMade(msg.sender, msg.value);
 
-        // Auto-finalize if hard cap reached
         if (totalRaised >= hardCap) {
             _finalizeSale();
         }
@@ -139,12 +133,11 @@ contract BackroomPresale is Ownable, ReentrancyGuard {
     function claimRefund() external onlyAfterSale nonReentrant {
         require(!saleSuccessful, "Sale was successful, no refunds");
         require(hasContributed[msg.sender], "No contribution found");
-        require(!hasRefunded[msg.sender], "Already refunded");
 
         uint256 refundAmount = contributions[msg.sender];
         require(refundAmount > 0, "No refund available");
 
-        hasRefunded[msg.sender] = true;
+        hasContributed[msg.sender] = false;
 
         (bool success, ) = payable(msg.sender).call{value: refundAmount}("");
         require(success, "Refund transfer failed");
@@ -182,8 +175,7 @@ contract BackroomPresale is Ownable, ReentrancyGuard {
             bool _saleSuccessful,
             uint256 _totalRaised,
             uint256 _startTime,
-            uint256 _endTime,
-            uint256 _contributors
+            uint256 _endTime
         )
     {
         return (
@@ -191,8 +183,7 @@ contract BackroomPresale is Ownable, ReentrancyGuard {
             saleSuccessful,
             totalRaised,
             saleStartTime,
-            saleEndTime,
-            contributors.length
+            saleEndTime
         );
     }
 
@@ -201,16 +192,8 @@ contract BackroomPresale is Ownable, ReentrancyGuard {
      */
     function getContributionInfo(
         address _contributor
-    )
-        external
-        view
-        returns (uint256 _contribution, bool _hasContributed, bool _hasRefunded)
-    {
-        return (
-            contributions[_contributor],
-            hasContributed[_contributor],
-            hasRefunded[_contributor]
-        );
+    ) external view returns (uint256 _contribution, bool _hasContributed) {
+        return (contributions[_contributor], hasContributed[_contributor]);
     }
 
     /**

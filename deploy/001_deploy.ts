@@ -34,25 +34,26 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 	}
 
 	// Get parameters from environment variables
-	const softCap = ethers.parseEther(process.env.SOFT_CAP);
-	const hardCap = ethers.parseEther(process.env.HARD_CAP);
-	const minContribution = ethers.parseEther(process.env.MIN_CONTRIBUTION);
-	const maxContribution = ethers.parseEther(process.env.MAX_CONTRIBUTION);
+	const softCap = ethers.formatEther(process.env.SOFT_CAP);
+	const hardCap = ethers.formatEther(process.env.HARD_CAP);
+	const minContribution = ethers.formatEther(process.env.MIN_CONTRIBUTION);
+	const maxContribution = ethers.formatEther(process.env.MAX_CONTRIBUTION);
+
 
 	console.log("Deployment parameters:");
-	console.log("- Soft Cap:", ethers.formatEther(softCap), "ETH");
-	console.log("- Hard Cap:", ethers.formatEther(hardCap), "ETH");
-	console.log("- Min Contribution:", ethers.formatEther(minContribution), "ETH");
-	console.log("- Max Contribution:", ethers.formatEther(maxContribution), "ETH");
+	console.log("- Soft Cap:", softCap, "ETH");
+	console.log("- Hard Cap:", hardCap, "ETH");
+	console.log("- Min Contribution:", minContribution, "ETH");
+	console.log("- Max Contribution:", maxContribution, "ETH");
 
 	// Deploy the contract using hardhat-deploy
 	const deployment = await deploy("BackroomPresale", {
 		from: deployer,
 		args: [
-			softCap,
-			hardCap,
-			minContribution,
-			maxContribution
+			ethers.parseEther(softCap),
+			ethers.parseEther(hardCap),
+			ethers.parseEther(minContribution),
+			ethers.parseEther(maxContribution)
 		],
 		log: true,
 		waitConfirmations: 1,
@@ -60,7 +61,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
 	console.log("BackroomPresale deployed to:", deployment.address);
 	console.log("Deployment transaction hash:", deployment.transactionHash);
-
 };
 
 export default func;

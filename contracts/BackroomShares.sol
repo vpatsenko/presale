@@ -1,8 +1,7 @@
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-
-// TODO: Events, final pricing model,
 
 contract BackroomsShares is Ownable {
     address public protocolFeeDestination;

@@ -2,11 +2,17 @@
 pragma solidity ^0.8.20;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract BackroomsShares is Ownable {
+    using SafeERC20 for ERC20;
+
     address public protocolFeeDestination;
     uint256 public protocolFeePercent;
     uint256 public subjectFeePercent;
+
+    address public token;
 
     event Trade(
         address trader,
@@ -28,11 +34,13 @@ contract BackroomsShares is Ownable {
     constructor(
         address _feeDestination,
         uint256 _protocolFeePercent,
-        uint256 _subjectFeePercent
+        uint256 _subjectFeePercent,
+        address _token
     ) Ownable(msg.sender) {
         protocolFeeDestination = _feeDestination;
         protocolFeePercent = _protocolFeePercent;
         subjectFeePercent = _subjectFeePercent;
+        token = _token;
     }
 
     function setFeeDestination(address _feeDestination) public onlyOwner {
@@ -103,13 +111,11 @@ contract BackroomsShares is Ownable {
             supply > 0 || sharesSubject == msg.sender,
             "Only the shares' subject can buy the first share"
         );
+
         uint256 price = getPrice(supply, amount);
         uint256 protocolFee = (price * protocolFeePercent) / 1 ether;
         uint256 subjectFee = (price * subjectFeePercent) / 1 ether;
-        require(
-            msg.value >= price + protocolFee + subjectFee,
-            "Insufficient payment"
-        );
+
         sharesBalance[sharesSubject][msg.sender] =
             sharesBalance[sharesSubject][msg.sender] +
             amount;
@@ -124,9 +130,19 @@ contract BackroomsShares is Ownable {
             subjectFee,
             supply + amount
         );
-        (bool success1, ) = protocolFeeDestination.call{value: protocolFee}("");
-        (bool success2, ) = sharesSubject.call{value: subjectFee}("");
-        require(success1 && success2, "Unable to send funds");
+
+        ERC20(token).safeTransferFrom(
+            msg.sender,
+            address(this),
+            price - protocolFee - subjectFee
+        );
+
+        ERC20(token).safeTransferFrom(
+            msg.sender,
+            protocolFeeDestination,
+            protocolFee
+        );
+        ERC20(token).safeTransferFrom(msg.sender, sharesSubject, subjectFee);
     }
 
     function sellShares(address sharesSubject, uint256 amount) public payable {
@@ -153,11 +169,13 @@ contract BackroomsShares is Ownable {
             subjectFee,
             supply - amount
         );
+
         (bool success1, ) = msg.sender.call{
             value: price - protocolFee - subjectFee
         }("");
         (bool success2, ) = protocolFeeDestination.call{value: protocolFee}("");
         (bool success3, ) = sharesSubject.call{value: subjectFee}("");
+
         require(success1 && success2 && success3, "Unable to send funds");
     }
 }

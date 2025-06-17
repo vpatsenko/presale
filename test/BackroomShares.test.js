@@ -8,11 +8,12 @@ describe("BackroomsShares", function () {
 	let protocolFeeDestination;
 	let subject;
 	let buyer;
+	let jhon;
 	let protocolFeePercent;
 	let subjectFeePercent;
 
 	beforeEach(async function () {
-		[owner, protocolFeeDestination, subject, buyer] = await ethers.getSigners();
+		[owner, protocolFeeDestination, subject, buyer, jhon] = await ethers.getSigners();
 		protocolFeePercent = ethers.parseEther("0.05"); // 5%
 		subjectFeePercent = ethers.parseEther("0.05"); // 5%
 
@@ -30,7 +31,9 @@ describe("BackroomsShares", function () {
 		await backroomShares.waitForDeployment();
 
 		const tokenAmount = ethers.parseEther("1000");
+
 		await testToken.transfer(buyer.address, tokenAmount);
+		await testToken.transfer(jhon.address, tokenAmount);
 		await testToken.transfer(subject.address, tokenAmount);
 	});
 
@@ -150,12 +153,27 @@ describe("BackroomsShares", function () {
 		});
 
 		it("Should not allow selling more shares than owned", async function () {
-			const buyAmount = 2;
-			const buyPrice = await backroomShares.getBuyPriceAfterFee(subject.address, buyAmount);
-			await backroomShares.connect(subject).buyShares(subject.address, buyAmount, { value: buyPrice });
+			const buyAmountBySubject = 1;
+			const buyPriceBySubject = await backroomShares.getBuyPriceAfterFee(subject.address, buyAmountBySubject);
+			await testToken.connect(subject).approve(await backroomShares.getAddress(), buyPriceBySubject);
+			await backroomShares.connect(subject).buyShares(subject.address, buyAmountBySubject);
+
+			const buyAmountByBuyer = 200;
+			const buyPriceByBuyer = await backroomShares.connect(buyer).getBuyPriceAfterFee(subject.address, buyAmountByBuyer);
+			await testToken.connect(buyer).approve(await backroomShares.getAddress(), buyPriceByBuyer);
+			await backroomShares.connect(buyer).buyShares(subject.address, buyAmountByBuyer);
+
+			const buyAmountByJhon = 10;
+			const buyPriceByJhon = await backroomShares.connect(jhon).getBuyPriceAfterFee(subject.address, buyAmountByJhon);
+			await testToken.connect(jhon).approve(await backroomShares.getAddress(), buyPriceByJhon);
+			await backroomShares.connect(jhon).buyShares(subject.address, buyAmountByJhon);
+
+			const sellAmountByBuyer = 201; // Trying to sell more than owned (buyer only has 2)
+			// Don't calculate price as it will overflow, just approve a large amount
+			await testToken.connect(buyer).approve(await backroomShares.getAddress(), ethers.parseEther("1000"));
 
 			await expect(
-				backroomShares.connect(subject).sellShares(subject.address, buyAmount + 1)
+				backroomShares.connect(buyer).sellShares(subject.address, sellAmountByBuyer)
 			).to.be.revertedWith("Insufficient shares");
 		});
 

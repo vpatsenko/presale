@@ -27,6 +27,9 @@ async function main(): Promise<void> {
 	await presale.connect(owner).startSale();
 	console.log("Sale started!");
 
+	console.log("Waiting 5 seconds...");
+	await new Promise(resolve => setTimeout(resolve, 5000));
+
 	info = await presale.getSaleInfo();
 	console.log("- Sale finalized:", info._saleFinalized);
 	console.log("- Start time:", new Date(Number(info._startTime) * 1000).toLocaleString());

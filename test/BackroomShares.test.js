@@ -188,49 +188,49 @@ describe("BackroomsShares", function () {
 		});
 	});
 
-	// describe("Price Calculations", function () {
-	// 	it("Should calculate correct buy price", async function () {
-	// 		const amount = 1;
-	// 		const price = await backroomShares.getBuyPrice(subject.address, amount);
-	// 		expect(price).to.be.gt(0);
-	// 	});
+	describe("Price Calculations", function () {
+		it("Should calculate correct buy price", async function () {
+			const amount = 1;
+			const price = await backroomShares.getBuyPrice(subject.address, amount);
+			expect(price).equal(0);
+		});
 
-	// 	it("Should calculate correct sell price", async function () {
-	// 		// First buy some shares
-	// 		const buyAmount = 2;
-	// 		const buyPrice = await backroomShares.getBuyPriceAfterFee(subject.address, buyAmount);
-	// 		await backroomShares.connect(subject).buyShares(subject.address, buyAmount, { value: buyPrice });
+		it("Should calculate correct sell price", async function () {
+			// First buy some shares
+			const buyAmount = 2;
+			const buyPrice = await backroomShares.getBuyPriceAfterFee(subject.address, buyAmount);
+			await backroomShares.connect(subject).buyShares(subject.address, buyAmount, { value: buyPrice });
 
-	// 		const sellAmount = 1;
-	// 		const sellPrice = await backroomShares.getSellPrice(subject.address, sellAmount);
-	// 		expect(sellPrice).to.be.gt(0);
-	// 	});
+			const sellAmount = 1;
+			const sellPrice = await backroomShares.getSellPrice(subject.address, sellAmount);
+			expect(sellPrice).to.be.gt(0);
+		});
 
-	// 	it("Should include fees in buy price after fee", async function () {
-	// 		const amount = 1;
-	// 		const basePrice = await backroomShares.getBuyPrice(subject.address, amount);
-	// 		const priceAfterFee = await backroomShares.getBuyPriceAfterFee(subject.address, amount);
+		it("Should include fees in buy price after fee", async function () {
+			const amount = 1;
+			const basePrice = await backroomShares.getBuyPrice(subject.address, amount);
+			const priceAfterFee = await backroomShares.getBuyPriceAfterFee(subject.address, amount);
 
-	// 		const expectedProtocolFee = (basePrice * protocolFeePercent) / ethers.parseEther("1");
-	// 		const expectedSubjectFee = (basePrice * subjectFeePercent) / ethers.parseEther("1");
+			const expectedProtocolFee = (basePrice * protocolFeePercent) / ethers.parseEther("1");
+			const expectedSubjectFee = (basePrice * subjectFeePercent) / ethers.parseEther("1");
 
-	// 		expect(priceAfterFee).to.equal(basePrice + expectedProtocolFee + expectedSubjectFee);
-	// 	});
+			expect(priceAfterFee).to.equal(basePrice + expectedProtocolFee + expectedSubjectFee);
+		});
 
-	// 	it("Should include fees in sell price after fee", async function () {
-	// 		// First buy some shares
-	// 		const buyAmount = 2;
-	// 		const buyPrice = await backroomShares.getBuyPriceAfterFee(subject.address, buyAmount);
-	// 		await backroomShares.connect(subject).buyShares(subject.address, buyAmount, { value: buyPrice });
+		it("Should include fees in sell price after fee", async function () {
+			// First buy some shares
+			const buyAmount = 2;
+			const buyPrice = await backroomShares.getBuyPriceAfterFee(subject.address, buyAmount);
+			await backroomShares.connect(subject).buyShares(subject.address, buyAmount, { value: buyPrice });
 
-	// 		const sellAmount = 1;
-	// 		const basePrice = await backroomShares.getSellPrice(subject.address, sellAmount);
-	// 		const priceAfterFee = await backroomShares.getSellPriceAfterFee(subject.address, sellAmount);
+			const sellAmount = 1;
+			const basePrice = await backroomShares.getSellPrice(subject.address, sellAmount);
+			const priceAfterFee = await backroomShares.getSellPriceAfterFee(subject.address, sellAmount);
 
-	// 		const expectedProtocolFee = (basePrice * protocolFeePercent) / ethers.parseEther("1");
-	// 		const expectedSubjectFee = (basePrice * subjectFeePercent) / ethers.parseEther("1");
+			const expectedProtocolFee = (basePrice * protocolFeePercent) / ethers.parseEther("1");
+			const expectedSubjectFee = (basePrice * subjectFeePercent) / ethers.parseEther("1");
 
-	// 		expect(priceAfterFee).to.equal(basePrice - expectedProtocolFee - expectedSubjectFee);
-	// 	});
-	// });
+			expect(priceAfterFee).to.equal(basePrice - expectedProtocolFee - expectedSubjectFee);
+		});
+	});
 });

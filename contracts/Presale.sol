@@ -20,7 +20,7 @@ contract BackroomPresale is Ownable, ReentrancyGuard {
     bool public saleFinalized; // Has sale been finalized
     bool public saleSuccessful; // Did sale meet soft cap
 
-    uint256 public constant SALE_DURATION = 30 minutes;
+    uint256 public constant SALE_DURATION = 24 hours;
 
     mapping(address => uint256) public contributions; // ETH contributed per address
     mapping(address => bool) public hasContributed; // Track if address contributed

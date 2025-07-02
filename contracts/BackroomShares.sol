@@ -47,6 +47,10 @@ contract BackroomsShares is Ownable {
         uint256 _divisor2,
         uint256 _divisor3
     ) Ownable(msg.sender) {
+        require(_divisor1 > 0, "Divisor1 cannot be zero");
+        require(_divisor2 > 0, "Divisor2 cannot be zero");
+        require(_divisor3 > 0, "Divisor3 cannot be zero");
+        
         protocolFeeDestination = _feeDestination;
         protocolFeePercent = _protocolFeePercent;
         subjectFeePercent = _subjectFeePercent;

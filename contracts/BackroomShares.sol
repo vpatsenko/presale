@@ -14,6 +14,13 @@ contract BackroomsShares is Ownable {
 
     address public token;
 
+    uint256 public divisor1;
+    uint256 public divisor2;
+    uint256 public divisor3;
+
+    // SharesSubject => Curve Index (1, 2, or 3)
+    mapping(address => uint256) public subjectCurve;
+
     event Trade(
         address trader,
         address subject,
@@ -35,12 +42,22 @@ contract BackroomsShares is Ownable {
         address _feeDestination,
         uint256 _protocolFeePercent,
         uint256 _subjectFeePercent,
-        address _token
+        address _token,
+        uint256 _divisor1,
+        uint256 _divisor2,
+        uint256 _divisor3
     ) Ownable(msg.sender) {
+        require(_divisor1 > 0, "Divisor1 cannot be zero");
+        require(_divisor2 > 0, "Divisor2 cannot be zero");
+        require(_divisor3 > 0, "Divisor3 cannot be zero");
+        
         protocolFeeDestination = _feeDestination;
         protocolFeePercent = _protocolFeePercent;
         subjectFeePercent = _subjectFeePercent;
         token = _token;
+        divisor1 = _divisor1;
+        divisor2 = _divisor2;
+        divisor3 = _divisor3;
     }
 
     function setFeeDestination(address _feeDestination) public onlyOwner {
@@ -55,10 +72,12 @@ contract BackroomsShares is Ownable {
         subjectFeePercent = _feePercent;
     }
 
+
     function getPrice(
         uint256 supply,
-        uint256 amount
-    ) public pure returns (uint256) {
+        uint256 amount,
+        address sharesSubject
+    ) public view returns (uint256) {
         uint256 sum1 = supply == 0
             ? 0
             : ((supply - 1) * (supply) * (2 * (supply - 1) + 1)) / 6;
@@ -68,21 +87,34 @@ contract BackroomsShares is Ownable {
                 (supply + amount) *
                 (2 * (supply - 1 + amount) + 1)) / 6;
         uint256 summation = sum2 - sum1;
-        return (summation * 1 ether) / 16000;
+        
+        uint256 divisor;
+        uint256 curveIndex = subjectCurve[sharesSubject];
+        if (curveIndex == 1) {
+            divisor = divisor1;
+        } else if (curveIndex == 2) {
+            divisor = divisor2;
+        } else if (curveIndex == 3) {
+            divisor = divisor3;
+        } else {
+            divisor = divisor1; // Default to first curve
+        }
+        
+        return (summation * 1 ether) / divisor;
     }
 
     function getBuyPrice(
         address sharesSubject,
         uint256 amount
     ) public view returns (uint256) {
-        return getPrice(sharesSupply[sharesSubject], amount);
+        return getPrice(sharesSupply[sharesSubject], amount, sharesSubject);
     }
 
     function getSellPrice(
         address sharesSubject,
         uint256 amount
     ) public view returns (uint256) {
-        return getPrice(sharesSupply[sharesSubject] - amount, amount);
+        return getPrice(sharesSupply[sharesSubject] - amount, amount, sharesSubject);
     }
 
     function getBuyPriceAfterFee(
@@ -105,14 +137,20 @@ contract BackroomsShares is Ownable {
         return price - protocolFee - subjectFee;
     }
 
-    function buyShares(address sharesSubject, uint256 amount) public payable {
+    function buyShares(address sharesSubject, uint256 amount, uint256 curveIndex) public payable {
         uint256 supply = sharesSupply[sharesSubject];
         require(
             supply > 0 || sharesSubject == msg.sender,
             "Only the shares' subject can buy the first share"
         );
 
-        uint256 price = getPrice(supply, amount);
+        // Set curve for subject on first share purchase
+        if (supply == 0 && sharesSubject == msg.sender) {
+            require(curveIndex >= 1 && curveIndex <= 3, "Invalid curve index");
+            subjectCurve[sharesSubject] = curveIndex;
+        }
+
+        uint256 price = getPrice(supply, amount, sharesSubject);
         uint256 protocolFee = (price * protocolFeePercent) / 1 ether;
         uint256 subjectFee = (price * subjectFeePercent) / 1 ether;
 
@@ -149,7 +187,7 @@ contract BackroomsShares is Ownable {
         uint256 supply = sharesSupply[sharesSubject];
         require(supply > amount, "Cannot sell the last share");
 
-        uint256 price = getPrice(supply - amount, amount);
+        uint256 price = getPrice(supply - amount, amount, sharesSubject);
         uint256 protocolFee = (price * protocolFeePercent) / 1 ether;
         uint256 subjectFee = (price * subjectFeePercent) / 1 ether;
 

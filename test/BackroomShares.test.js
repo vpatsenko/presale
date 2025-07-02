@@ -26,7 +26,10 @@ describe("BackroomsShares", function () {
 			protocolFeeDestination.address,
 			protocolFeePercent,
 			subjectFeePercent,
-			await testToken.getAddress()
+			await testToken.getAddress(),
+			16000, // divisor1
+			32000, // divisor2
+			8000   // divisor3
 		);
 		await backroomShares.waitForDeployment();
 
@@ -90,7 +93,7 @@ describe("BackroomsShares", function () {
 			await testToken.connect(subject).approve(await backroomShares.getAddress(), price);
 
 			await expect(
-				backroomShares.connect(subject).buyShares(subject.address, amount)
+				backroomShares.connect(subject).buyShares(subject.address, amount, 1)
 			).to.emit(backroomShares, "Trade")
 				.withArgs(
 					subject.address,
@@ -111,14 +114,14 @@ describe("BackroomsShares", function () {
 			const firstAmount = 1;
 			const firstPrice = await backroomShares.getBuyPriceAfterFee(subject.address, firstAmount);
 			await testToken.connect(subject).approve(await backroomShares.getAddress(), firstPrice);
-			await backroomShares.connect(subject).buyShares(subject.address, firstAmount);
+			await backroomShares.connect(subject).buyShares(subject.address, firstAmount, 1);
 
 			const amount = 2;
 			const price = await backroomShares.getBuyPriceAfterFee(subject.address, amount);
 			await testToken.connect(buyer).approve(await backroomShares.getAddress(), price);
 
 			await expect(
-				backroomShares.connect(buyer).buyShares(subject.address, amount)
+				backroomShares.connect(buyer).buyShares(subject.address, amount, 1)
 			).to.emit(backroomShares, "Trade");
 
 			expect(await backroomShares.sharesBalance(subject.address, buyer.address)).to.equal(amount);
@@ -129,13 +132,13 @@ describe("BackroomsShares", function () {
 			const buyAmountBySubject = 1;
 			const buyPriceBySubject = await backroomShares.getBuyPriceAfterFee(subject.address, buyAmountBySubject);
 			await testToken.connect(subject).approve(await backroomShares.getAddress(), buyPriceBySubject);
-			await backroomShares.connect(subject).buyShares(subject.address, buyAmountBySubject);
+			await backroomShares.connect(subject).buyShares(subject.address, buyAmountBySubject, 1);
 
 			const buyAmountByBuyer = 2;
 			const buyPriceByBuyer = await backroomShares.getBuyPriceAfterFee(subject.address, buyAmountByBuyer);
 
 			await testToken.connect(buyer).approve(await backroomShares.getAddress(), buyPriceByBuyer);
-			await backroomShares.connect(buyer).buyShares(subject.address, buyAmountByBuyer);
+			await backroomShares.connect(buyer).buyShares(subject.address, buyAmountByBuyer, 1);
 
 			const sellAmountByBuyer = 1;
 			const sellPriceByBuyer = await backroomShares.connect(buyer).getSellPriceAfterFee(subject.address, sellAmountByBuyer);
@@ -156,17 +159,17 @@ describe("BackroomsShares", function () {
 			const buyAmountBySubject = 1;
 			const buyPriceBySubject = await backroomShares.getBuyPriceAfterFee(subject.address, buyAmountBySubject);
 			await testToken.connect(subject).approve(await backroomShares.getAddress(), buyPriceBySubject);
-			await backroomShares.connect(subject).buyShares(subject.address, buyAmountBySubject);
+			await backroomShares.connect(subject).buyShares(subject.address, buyAmountBySubject, 1);
 
 			const buyAmountByBuyer = 200;
 			const buyPriceByBuyer = await backroomShares.connect(buyer).getBuyPriceAfterFee(subject.address, buyAmountByBuyer);
 			await testToken.connect(buyer).approve(await backroomShares.getAddress(), buyPriceByBuyer);
-			await backroomShares.connect(buyer).buyShares(subject.address, buyAmountByBuyer);
+			await backroomShares.connect(buyer).buyShares(subject.address, buyAmountByBuyer, 1);
 
 			const buyAmountByJhon = 10;
 			const buyPriceByJhon = await backroomShares.connect(jhon).getBuyPriceAfterFee(subject.address, buyAmountByJhon);
 			await testToken.connect(jhon).approve(await backroomShares.getAddress(), buyPriceByJhon);
-			await backroomShares.connect(jhon).buyShares(subject.address, buyAmountByJhon);
+			await backroomShares.connect(jhon).buyShares(subject.address, buyAmountByJhon, 1);
 
 			const sellAmountByBuyer = 201; // Trying to sell more than owned (buyer only has 2)
 			// Don't calculate price as it will overflow, just approve a large amount
@@ -180,7 +183,8 @@ describe("BackroomsShares", function () {
 		it("Should not allow selling the last share", async function () {
 			const buyAmount = 1;
 			const buyPrice = await backroomShares.getBuyPriceAfterFee(subject.address, buyAmount);
-			await backroomShares.connect(subject).buyShares(subject.address, buyAmount, { value: buyPrice });
+			await testToken.connect(subject).approve(await backroomShares.getAddress(), buyPrice);
+			await backroomShares.connect(subject).buyShares(subject.address, buyAmount, 1);
 
 			await expect(
 				backroomShares.connect(subject).sellShares(subject.address, buyAmount)
@@ -213,7 +217,7 @@ describe("BackroomsShares", function () {
 
 			// Approve tokens before buying
 			await testToken.connect(subject).approve(await backroomShares.getAddress(), buyPrice);
-			await backroomShares.connect(subject).buyShares(subject.address, buyAmount);
+			await backroomShares.connect(subject).buyShares(subject.address, buyAmount, 1);
 
 			const sellAmount = 1;
 			const basePrice = await backroomShares.getSellPrice(subject.address, sellAmount);

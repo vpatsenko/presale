@@ -5,7 +5,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-contract BackroomsShares is Ownable {
+contract BackroomShares is Ownable {
     using SafeERC20 for ERC20;
 
     address public protocolFeeDestination;
@@ -50,7 +50,7 @@ contract BackroomsShares is Ownable {
         require(_divisor1 > 0, "Divisor1 cannot be zero");
         require(_divisor2 > 0, "Divisor2 cannot be zero");
         require(_divisor3 > 0, "Divisor3 cannot be zero");
-        
+
         protocolFeeDestination = _feeDestination;
         protocolFeePercent = _protocolFeePercent;
         subjectFeePercent = _subjectFeePercent;
@@ -72,7 +72,6 @@ contract BackroomsShares is Ownable {
         subjectFeePercent = _feePercent;
     }
 
-
     function getPrice(
         uint256 supply,
         uint256 amount,
@@ -87,7 +86,7 @@ contract BackroomsShares is Ownable {
                 (supply + amount) *
                 (2 * (supply - 1 + amount) + 1)) / 6;
         uint256 summation = sum2 - sum1;
-        
+
         uint256 divisor;
         uint256 curveIndex = subjectCurve[sharesSubject];
         if (curveIndex == 1) {
@@ -99,7 +98,7 @@ contract BackroomsShares is Ownable {
         } else {
             divisor = divisor1; // Default to first curve
         }
-        
+
         return (summation * 1 ether) / divisor;
     }
 
@@ -114,7 +113,12 @@ contract BackroomsShares is Ownable {
         address sharesSubject,
         uint256 amount
     ) public view returns (uint256) {
-        return getPrice(sharesSupply[sharesSubject] - amount, amount, sharesSubject);
+        return
+            getPrice(
+                sharesSupply[sharesSubject] - amount,
+                amount,
+                sharesSubject
+            );
     }
 
     function getBuyPriceAfterFee(
@@ -137,7 +141,11 @@ contract BackroomsShares is Ownable {
         return price - protocolFee - subjectFee;
     }
 
-    function buyShares(address sharesSubject, uint256 amount, uint256 curveIndex) public payable {
+    function buyShares(
+        address sharesSubject,
+        uint256 amount,
+        uint256 curveIndex
+    ) public payable {
         uint256 supply = sharesSupply[sharesSubject];
         require(
             supply > 0 || sharesSubject == msg.sender,

@@ -1,7 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
-describe("BackroomsShares", function () {
+describe("BackroomShares", function () {
 	let backroomShares;
 	let testToken;
 	let owner;
@@ -21,7 +21,7 @@ describe("BackroomsShares", function () {
 		testToken = await TestToken.deploy();
 		await testToken.waitForDeployment();
 
-		const BackroomsShares = await ethers.getContractFactory("BackroomsShares");
+		const BackroomsShares = await ethers.getContractFactory("BackroomShares");
 		backroomShares = await BackroomsShares.deploy(
 			protocolFeeDestination.address,
 			protocolFeePercent,

@@ -1,13 +1,14 @@
-const { expect } = require("chai");
-
-const { ethers } = require("hardhat");
+import { expect } from "chai";
+import { ethers } from "hardhat";
+import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
+import { BackroomPresale } from "../typechain-types";
 
 describe("BackroomPresale", function () {
-	let presale;
-	let owner;
-	let contributor1;
-	let contributor2;
-	let contributor3;
+	let presale: BackroomPresale;
+	let owner: SignerWithAddress;
+	let contributor1: SignerWithAddress;
+	let contributor2: SignerWithAddress;
+	let contributor3: SignerWithAddress;
 
 	const softCap = ethers.parseEther("10");
 	const hardCap = ethers.parseEther("100");

@@ -1,21 +1,27 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
-const { MerkleTree } = require("merkletreejs");
+import { expect } from "chai";
+import { ethers } from "hardhat";
+import { MerkleTree } from "merkletreejs";
+import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
+import { MerkleTreeDistributor, TestToken } from "../typechain-types";
+
+interface Claim {
+	address: string;
+	amount: bigint;
+}
 
 describe("MerkleTreeDistributor", function () {
-	let merkleTreeDistributor;
-	let testToken;
-	let owner;
-	let user1;
-	let user2;
-	let user3;
-	let merkleRoot;
-	let claims;
-	let merkleTree;
+	let merkleTreeDistributor: MerkleTreeDistributor;
+	let testToken: TestToken;
+	let owner: SignerWithAddress;
+	let user1: SignerWithAddress;
+	let user2: SignerWithAddress;
+	let user3: SignerWithAddress;
+	let merkleRoot: string;
+	let claims: Claim[];
+	let merkleTree: MerkleTree;
 
 	// Helper function to create merkle tree
-	function createMerkleTree(claims) {
-
+	function createMerkleTree(claims: Claim[]): MerkleTree {
 		const leaves = claims.map(claim =>
 			ethers.keccak256(ethers.solidityPacked(["address", "uint256"], [claim.address, claim.amount]))
 		);
@@ -171,6 +177,8 @@ describe("MerkleTreeDistributor", function () {
 		});
 
 		it("Should allow multiple different users to claim", async function () {
+			const users = [user1, user2, user3];
+			
 			for (let i = 0; i < claims.length; i++) {
 				const claim = claims[i];
 				const leaf = ethers.keccak256(
@@ -178,7 +186,7 @@ describe("MerkleTreeDistributor", function () {
 				);
 				const proof = merkleTree.getHexProof(leaf);
 
-				const user = [user1, user2, user3][i];
+				const user = users[i];
 				const initialBalance = await testToken.balanceOf(user.address);
 
 				await merkleTreeDistributor.connect(user).claim(claim.address, claim.amount, proof);
@@ -234,7 +242,7 @@ describe("MerkleTreeDistributor", function () {
 	describe("Edge Cases", function () {
 		it("Should handle empty proof array", async function () {
 			const claim = claims[0];
-			const emptyProof = [];
+			const emptyProof: string[] = [];
 
 			await expect(
 				merkleTreeDistributor.connect(user1).claim(claim.address, claim.amount, emptyProof)
@@ -243,7 +251,7 @@ describe("MerkleTreeDistributor", function () {
 
 		it("Should handle zero amount claim", async function () {
 			// Create a special claim with zero amount
-			const zeroAmountClaim = { address: user1.address, amount: 0 };
+			const zeroAmountClaim: Claim = { address: user1.address, amount: 0n };
 			const specialClaims = [zeroAmountClaim];
 			const specialTree = createMerkleTree(specialClaims);
 			const specialRoot = specialTree.getHexRoot();

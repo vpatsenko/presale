@@ -1,16 +1,18 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
+import { expect } from "chai";
+import { ethers } from "hardhat";
+import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
+import { BackroomShares, TestToken } from "../typechain-types";
 
 describe("BackroomShares", function () {
-	let backroomShares;
-	let testToken;
-	let owner;
-	let protocolFeeDestination;
-	let subject;
-	let buyer;
-	let jhon;
-	let protocolFeePercent;
-	let subjectFeePercent;
+	let backroomShares: BackroomShares;
+	let testToken: TestToken;
+	let owner: SignerWithAddress;
+	let protocolFeeDestination: SignerWithAddress;
+	let subject: SignerWithAddress;
+	let buyer: SignerWithAddress;
+	let jhon: SignerWithAddress;
+	let protocolFeePercent: bigint;
+	let subjectFeePercent: bigint;
 
 	beforeEach(async function () {
 		[owner, protocolFeeDestination, subject, buyer, jhon] = await ethers.getSigners();
@@ -27,9 +29,9 @@ describe("BackroomShares", function () {
 			protocolFeePercent,
 			subjectFeePercent,
 			await testToken.getAddress(),
-			16000, // divisor1
-			32000, // divisor2
-			8000   // divisor3
+			16000n, // divisor1
+			32000n, // divisor2
+			8000n   // divisor3
 		);
 		await backroomShares.waitForDeployment();
 
@@ -87,7 +89,7 @@ describe("BackroomShares", function () {
 
 	describe("Share Trading with ERC20", function () {
 		it("Should allow subject to buy first share with ERC20", async function () {
-			const amount = 1;
+			const amount = 1n;
 			const price = await backroomShares.getBuyPriceAfterFee(subject.address, amount);
 
 			await testToken.connect(subject).approve(await backroomShares.getAddress(), price);
@@ -111,12 +113,12 @@ describe("BackroomShares", function () {
 		});
 
 		it("Should allow buying shares after first share exists with ERC20", async function () {
-			const firstAmount = 1;
+			const firstAmount = 1n;
 			const firstPrice = await backroomShares.getBuyPriceAfterFee(subject.address, firstAmount);
 			await testToken.connect(subject).approve(await backroomShares.getAddress(), firstPrice);
 			await backroomShares.connect(subject).buyShares(subject.address, firstAmount, 1);
 
-			const amount = 2;
+			const amount = 2n;
 			const price = await backroomShares.getBuyPriceAfterFee(subject.address, amount);
 			await testToken.connect(buyer).approve(await backroomShares.getAddress(), price);
 
@@ -129,18 +131,18 @@ describe("BackroomShares", function () {
 		});
 
 		it("Should allow selling shares with ERC20", async function () {
-			const buyAmountBySubject = 1;
+			const buyAmountBySubject = 1n;
 			const buyPriceBySubject = await backroomShares.getBuyPriceAfterFee(subject.address, buyAmountBySubject);
 			await testToken.connect(subject).approve(await backroomShares.getAddress(), buyPriceBySubject);
 			await backroomShares.connect(subject).buyShares(subject.address, buyAmountBySubject, 1);
 
-			const buyAmountByBuyer = 2;
+			const buyAmountByBuyer = 2n;
 			const buyPriceByBuyer = await backroomShares.getBuyPriceAfterFee(subject.address, buyAmountByBuyer);
 
 			await testToken.connect(buyer).approve(await backroomShares.getAddress(), buyPriceByBuyer);
 			await backroomShares.connect(buyer).buyShares(subject.address, buyAmountByBuyer, 1);
 
-			const sellAmountByBuyer = 1;
+			const sellAmountByBuyer = 1n;
 			const sellPriceByBuyer = await backroomShares.connect(buyer).getSellPriceAfterFee(subject.address, sellAmountByBuyer);
 
 			await testToken.connect(buyer).approve(await backroomShares.getAddress(), sellPriceByBuyer);
@@ -156,22 +158,22 @@ describe("BackroomShares", function () {
 		});
 
 		it("Should not allow selling more shares than owned", async function () {
-			const buyAmountBySubject = 1;
+			const buyAmountBySubject = 1n;
 			const buyPriceBySubject = await backroomShares.getBuyPriceAfterFee(subject.address, buyAmountBySubject);
 			await testToken.connect(subject).approve(await backroomShares.getAddress(), buyPriceBySubject);
 			await backroomShares.connect(subject).buyShares(subject.address, buyAmountBySubject, 1);
 
-			const buyAmountByBuyer = 200;
+			const buyAmountByBuyer = 200n;
 			const buyPriceByBuyer = await backroomShares.connect(buyer).getBuyPriceAfterFee(subject.address, buyAmountByBuyer);
 			await testToken.connect(buyer).approve(await backroomShares.getAddress(), buyPriceByBuyer);
 			await backroomShares.connect(buyer).buyShares(subject.address, buyAmountByBuyer, 1);
 
-			const buyAmountByJhon = 10;
+			const buyAmountByJhon = 10n;
 			const buyPriceByJhon = await backroomShares.connect(jhon).getBuyPriceAfterFee(subject.address, buyAmountByJhon);
 			await testToken.connect(jhon).approve(await backroomShares.getAddress(), buyPriceByJhon);
 			await backroomShares.connect(jhon).buyShares(subject.address, buyAmountByJhon, 1);
 
-			const sellAmountByBuyer = 201; // Trying to sell more than owned (buyer only has 2)
+			const sellAmountByBuyer = 201n; // Trying to sell more than owned (buyer only has 200)
 			// Don't calculate price as it will overflow, just approve a large amount
 			await testToken.connect(buyer).approve(await backroomShares.getAddress(), ethers.parseEther("1000"));
 
@@ -181,7 +183,7 @@ describe("BackroomShares", function () {
 		});
 
 		it("Should not allow selling the last share", async function () {
-			const buyAmount = 1;
+			const buyAmount = 1n;
 			const buyPrice = await backroomShares.getBuyPriceAfterFee(subject.address, buyAmount);
 			await testToken.connect(subject).approve(await backroomShares.getAddress(), buyPrice);
 			await backroomShares.connect(subject).buyShares(subject.address, buyAmount, 1);
@@ -194,13 +196,13 @@ describe("BackroomShares", function () {
 
 	describe("Price Calculations", function () {
 		it("Should calculate correct buy price for the first share", async function () {
-			const amount = 1;
+			const amount = 1n;
 			const price = await backroomShares.getBuyPrice(subject.address, amount);
 			expect(price).equal(0);
 		});
 
 		it("Should include fees in buy price after fee", async function () {
-			const amount = 1;
+			const amount = 1n;
 			const basePrice = await backroomShares.getBuyPrice(subject.address, amount);
 			const priceAfterFee = await backroomShares.getBuyPriceAfterFee(subject.address, amount);
 
@@ -212,14 +214,14 @@ describe("BackroomShares", function () {
 
 		it("Should include fees in sell price after fee", async function () {
 			// First buy some shares
-			const buyAmount = 1;
+			const buyAmount = 1n;
 			const buyPrice = await backroomShares.getBuyPriceAfterFee(subject.address, buyAmount);
 
 			// Approve tokens before buying
 			await testToken.connect(subject).approve(await backroomShares.getAddress(), buyPrice);
 			await backroomShares.connect(subject).buyShares(subject.address, buyAmount, 1);
 
-			const sellAmount = 1;
+			const sellAmount = 1n;
 			const basePrice = await backroomShares.getSellPrice(subject.address, sellAmount);
 			const priceAfterFee = await backroomShares.getSellPriceAfterFee(subject.address, sellAmount);
 

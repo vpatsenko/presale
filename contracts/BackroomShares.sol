@@ -177,12 +177,7 @@ contract BackroomShares is Ownable {
             supply + amount
         );
 
-        ERC20(token).safeTransferFrom(
-            msg.sender,
-            address(this),
-            price - protocolFee - subjectFee
-        );
-
+        ERC20(token).safeTransferFrom(msg.sender, address(this), price);
         ERC20(token).safeTransferFrom(
             msg.sender,
             protocolFeeDestination,

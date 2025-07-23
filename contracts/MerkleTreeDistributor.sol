@@ -10,11 +10,12 @@ contract MerkleTreeDistributor is Ownable {
     using SafeERC20 for ERC20;
 
     ERC20 public immutable token;
-    bytes32 public immutable merkleRoot;
+    bytes32 public merkleRoot;
 
     mapping(address => bool) public claimed;
 
     event Claimed(address indexed account, uint256 amount);
+    event RootChanged(bytes32 indexed oldRoot, bytes32 indexed newRoot);
 
     constructor(address _token, bytes32 _merkleRoot) Ownable(msg.sender) {
         token = ERC20(_token);
@@ -42,6 +43,13 @@ contract MerkleTreeDistributor is Ownable {
 
     function isClaimed(address account) external view returns (bool) {
         return claimed[account];
+    }
+
+    function changeRoot(bytes32 _newMerkleRoot) external onlyOwner {
+        bytes32 oldRoot = merkleRoot;
+        merkleRoot = _newMerkleRoot;
+
+        emit RootChanged(oldRoot, _newMerkleRoot);
     }
 
     function withdrawRemainingTokens() external onlyOwner {

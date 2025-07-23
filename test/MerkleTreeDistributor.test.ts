@@ -178,7 +178,7 @@ describe("MerkleTreeDistributor", function () {
 
 		it("Should allow multiple different users to claim", async function () {
 			const users = [user1, user2, user3];
-			
+
 			for (let i = 0; i < claims.length; i++) {
 				const claim = claims[i];
 				const leaf = ethers.keccak256(
@@ -236,6 +236,55 @@ describe("MerkleTreeDistributor", function () {
 
 			const finalOwnerBalance = await testToken.balanceOf(owner.address);
 			expect(finalOwnerBalance - initialOwnerBalance).to.equal(remainingBalance);
+		});
+	});
+
+	describe("Real Data Test", function () {
+		it("Should handle claim with provided real data", async function () {
+			const realRoot = "0x5d6d375c54e4160d4308bc067d516df6d0ac466b7265196f321363653c3e41bc";
+			const realClaim = {
+				address: "0x3Dc419253352b9e0DBFC047786D7fF3197624cC4",
+				amount: ethers.parseUnits("153831.263768699312", 18),
+				leafIndex: 0,
+				proof: [
+					"0xc3c24f071a2ed02292ceee2a09e6cea80401a1869ca98fef101009cd45912c8b",
+					"0x039f725d3d622af7c60ea303f56b89cc4f273626b309b3e39f51de1197ed651c",
+					"0x664911c62b20a48110db47fa7bff58966c3ec8904874acf0994ec73df8c09968",
+					"0x4229b24279e5346d63d712770429dbcbf1cee1f356f1b8b8b60d0b494dadbae8",
+					"0x18a3c5a7c9cdfe1de30a283fc09dd426d3eec4d6301b12c98ec771b578d14993",
+					"0xf90bc955ffa81d15e802a6888fbe6487715bca731ef997abadd5861ed6782b9f",
+					"0x5824a8a04ee6b9d66c0ec51ee4e3e4dee66307b0b655ffe8d121b2866f644354",
+					"0xc5cf97c623fb2bbec865ca40be9e729d97e8bb06ee58e841aeb72ea21016cad9",
+					"0xd255bdb2d59e63d88d2fef089efee667752413fa3d4afd7da65a93b4004eeb6b"
+				]
+			};
+
+			// Deploy distributor with real root
+			const MerkleTreeDistributor = await ethers.getContractFactory("MerkleTreeDistributor");
+			const realDistributor = await MerkleTreeDistributor.deploy(
+				await testToken.getAddress(),
+				realRoot
+			);
+			await realDistributor.waitForDeployment();
+
+			// Transfer tokens to distributor
+			const totalAmount = ethers.parseUnits("200000", 18);
+			await testToken.transfer(await realDistributor.getAddress(), totalAmount);
+
+			// Test the claim
+			const initialBalance = await testToken.balanceOf(realClaim.address);
+
+			await expect(
+				realDistributor.claim(realClaim.address, realClaim.amount, realClaim.proof)
+			)
+				.to.emit(realDistributor, "Claimed")
+				.withArgs(realClaim.address, realClaim.amount);
+
+			const finalBalance = await testToken.balanceOf(realClaim.address);
+			expect(finalBalance - initialBalance).to.equal(realClaim.amount);
+
+			// Verify claim status
+			expect(await realDistributor.isClaimed(realClaim.address)).to.be.true;
 		});
 	});
 

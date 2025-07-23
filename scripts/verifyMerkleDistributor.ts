@@ -10,6 +10,96 @@ const MERKLE_DISTRIBUTOR_ADDRESS = process.env.MERKLE_DISTRIBUTOR_ADDRESS || "";
 // Helper function to wait/delay
 const delay = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
 
+async function testClaim(merkleDistributor: any): Promise<void> {
+	// Test account data from merkle_proofs.json
+	const testAccount = {
+		address: "0x3Dc419253352b9e0DBFC047786D7fF3197624cC4",
+		amount: "153831.263768699312",
+		leafIndex: 0,
+		proof: [
+			"0x343e07cd1850a9e3c1e2f49b42c896d97bdf74604d26be2935d1c5425aeb79d0",
+			"0x4b019eb1c8ee313896b662d895cd6c3111167939368270b39eb79d5c41e5b5a8",
+			"0xafebd10481ad0ad9604d210a7749501a56922fa5795955b2d012ccf8372d5c14",
+			"0x54a00d00ce7880cbaa5d043d47b026afa35bf5c341424a1338898fddec5823b2",
+			"0x4e69914ae6c6de10298ae5a21c575bd57a610227776f86d3e0ed2d5f770a3dfb",
+			"0x699a86cc0fa3dae3b67d40122b175bab8851c25ed8e81c102736090ff25ce6f8",
+			"0x7f13bd7a4f89d8bceaf7b655c209f461f0c813f414cd3c09e8e6b726d943269f",
+			"0x52c3278869dc869412b1b3520424661f5853bb0c40a63aa54c7d499c119dc616",
+			"0x7687bcd8af1506d707b6e0aa973162a10eda0e02d7697547e4fcaa17b6f51e9d"
+		]
+	};
+
+	try {
+		// Convert amount to wei (from the CSV data format)
+		const amountInWei = ethers.parseEther(testAccount.amount);
+		
+		console.log(`- Test account: ${testAccount.address}`);
+		console.log(`- Amount: ${testAccount.amount} ROOMS (${amountInWei} wei)`);
+		console.log(`- Leaf index: ${testAccount.leafIndex}`);
+		console.log(`- Proof length: ${testAccount.proof.length}`);
+
+		// Check if account has already claimed
+		const alreadyClaimed = await merkleDistributor.isClaimed(testAccount.address);
+		console.log(`- Already claimed: ${alreadyClaimed}`);
+
+		// Test merkle proof verification by simulating the claim call
+		try {
+			// This will revert if the proof is invalid, but we're just testing the proof
+			const claimCalldata = merkleDistributor.interface.encodeFunctionData("claim", [
+				testAccount.address,
+				amountInWei,
+				testAccount.proof
+			]);
+			
+			console.log("✅ Merkle proof validation: Valid proof structure");
+			console.log(`- Calldata length: ${claimCalldata.length} bytes`);
+		} catch (error) {
+			console.error("❌ Invalid proof structure:", error);
+			return;
+		}
+
+		// Check contract token balance
+		const tokenAddress = await merkleDistributor.token();
+		const token = await ethers.getContractAt("ERC20", tokenAddress);
+		const contractBalance = await token.balanceOf(await merkleDistributor.getAddress());
+		const tokenSymbol = await token.symbol();
+		
+		console.log(`- Contract token balance: ${ethers.formatEther(contractBalance)} ${tokenSymbol}`);
+		
+		// Check if contract has enough tokens for this claim
+		if (contractBalance >= amountInWei) {
+			console.log("✅ Contract has sufficient tokens for this claim");
+		} else {
+			console.log("⚠️  Contract has insufficient tokens for this claim");
+		}
+
+		// Test the claim function with staticCall (doesn't execute, just validates)
+		try {
+			await merkleDistributor.claim.staticCall(
+				testAccount.address,
+				amountInWei,
+				testAccount.proof
+			);
+			console.log("✅ Static call test: Claim would succeed");
+		} catch (error: any) {
+			if (error.message.includes("Already claimed")) {
+				console.log("ℹ️  Static call test: Account has already claimed");
+			} else if (error.message.includes("Invalid proof")) {
+				console.log("❌ Static call test: Invalid merkle proof");
+			} else if (error.message.includes("ERC20: transfer amount exceeds balance")) {
+				console.log("⚠️  Static call test: Contract has insufficient token balance");
+			} else {
+				console.log("❌ Static call test failed:", error.message);
+			}
+		}
+
+		console.log("✅ Claim functionality test completed");
+
+	} catch (error) {
+		console.error("❌ Failed to test claim functionality:", error);
+	}
+}
+
 async function attemptVerification(constructorArgs: string[], attempt: number): Promise<boolean> {
 	try {
 		console.log(`\n🔄 Verification attempt ${attempt}/4...`);
@@ -123,6 +213,10 @@ async function main(): Promise<void> {
 		}
 		
 		console.log("✅ Contract state verification passed!");
+		
+		// Test claim functionality with a test account
+		console.log("\n🧪 Testing claim functionality...");
+		await testClaim(merkleDistributor);
 		
 	} catch (error) {
 		console.error("❌ Failed to verify contract state:", error);

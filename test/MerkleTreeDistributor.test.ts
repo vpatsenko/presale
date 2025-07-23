@@ -45,11 +45,23 @@ describe("MerkleTreeDistributor", function () {
 			{ address: user3.address, amount: ethers.parseEther("300") }
 		];
 
+		console.log("=======")
+		console.log("=======")
+		console.log(user1.address)
+		console.log(user2.address)
+		console.log(user3.address)
+
+
 		// Create merkle tree
 		merkleTree = createMerkleTree(claims);
 		merkleRoot = merkleTree.getHexRoot();
 
+		console.log("merkleRoot:", merkleRoot)
+		console.log("=======")
+		console.log("=======")
+
 		// Deploy MerkleTreeDistributor
+
 		const MerkleTreeDistributor = await ethers.getContractFactory("MerkleTreeDistributor");
 		merkleTreeDistributor = await MerkleTreeDistributor.deploy(
 			await testToken.getAddress(),
@@ -241,21 +253,21 @@ describe("MerkleTreeDistributor", function () {
 
 	describe("Real Data Test", function () {
 		it("Should handle claim with provided real data", async function () {
-			const realRoot = "0x5d6d375c54e4160d4308bc067d516df6d0ac466b7265196f321363653c3e41bc";
+			const realRoot = "0x770ae7f938ac015ad0133374302b213553ff5f41c9044acc372e7866ae895ebc";
 			const realClaim = {
 				address: "0x3Dc419253352b9e0DBFC047786D7fF3197624cC4",
-				amount: ethers.parseUnits("153831.263768699312", 18),
+				amount: "153831263768699312000000",
 				leafIndex: 0,
 				proof: [
-					"0xc3c24f071a2ed02292ceee2a09e6cea80401a1869ca98fef101009cd45912c8b",
-					"0x039f725d3d622af7c60ea303f56b89cc4f273626b309b3e39f51de1197ed651c",
-					"0x664911c62b20a48110db47fa7bff58966c3ec8904874acf0994ec73df8c09968",
-					"0x4229b24279e5346d63d712770429dbcbf1cee1f356f1b8b8b60d0b494dadbae8",
-					"0x18a3c5a7c9cdfe1de30a283fc09dd426d3eec4d6301b12c98ec771b578d14993",
-					"0xf90bc955ffa81d15e802a6888fbe6487715bca731ef997abadd5861ed6782b9f",
-					"0x5824a8a04ee6b9d66c0ec51ee4e3e4dee66307b0b655ffe8d121b2866f644354",
-					"0xc5cf97c623fb2bbec865ca40be9e729d97e8bb06ee58e841aeb72ea21016cad9",
-					"0xd255bdb2d59e63d88d2fef089efee667752413fa3d4afd7da65a93b4004eeb6b"
+					"0xba7359b199a7fd36f4947aecf46869afad1bb02e3d1ea655a9a75e2f20951a82",
+					"0xdf1ff201822be2416789a0ee6543c52a9befac18fdf8772c23a820f14ac11de9",
+					"0x7b9574bf7c3b9c66ab37b76abaefd88c8ecf7fe9e4d70ea247c14a84cae971b5",
+					"0x7b05345fb080074fda715d2a10f19471e6d2cb7e21e5cf5a840c461e917b2c5d",
+					"0x2a2a11fadcd77770a30ca5aa9c45f384cd60ba7dc2cfd848ec04e9962d278e74",
+					"0xbc736f119396bdf416149592f9b1cbba5493dc19707268130891a622cc94539f",
+					"0xc9f21db481ca36a9b4c1521b852df8b6b53e6805de9c9f7f51ed98e2c2fde33e",
+					"0xd5ae8123c47bde427eb7ef010f4d16c66e7deed1b0cce47404e964cb4102891d",
+					"0x2c27eae31c94ac7cc461d57fc583a9fde9c1affd580568b19c4427743d887940"
 				]
 			};
 

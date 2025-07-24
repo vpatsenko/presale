@@ -29,7 +29,8 @@ contract BackroomShares is Ownable {
         uint256 ethAmount,
         uint256 protocolEthAmount,
         uint256 subjectEthAmount,
-        uint256 supply
+        uint256 supply,
+        uint256 denominator
     );
 
     // SharesSubject => (Holder => Balance)
@@ -166,6 +167,20 @@ contract BackroomShares is Ownable {
             sharesBalance[sharesSubject][msg.sender] +
             amount;
         sharesSupply[sharesSubject] = supply + amount;
+
+        uint256 divisor;
+        curveIndex = subjectCurve[sharesSubject];
+
+        if (curveIndex == 1) {
+            divisor = divisor1;
+        } else if (curveIndex == 2) {
+            divisor = divisor2;
+        } else if (curveIndex == 3) {
+            divisor = divisor3;
+        } else {
+            divisor = divisor1; // Default to first curve
+        }
+
         emit Trade(
             msg.sender,
             sharesSubject,
@@ -174,7 +189,8 @@ contract BackroomShares is Ownable {
             price,
             protocolFee,
             subjectFee,
-            supply + amount
+            supply + amount,
+            divisor
         );
 
         ERC20(token).safeTransferFrom(msg.sender, address(this), price);
@@ -204,6 +220,19 @@ contract BackroomShares is Ownable {
             amount;
         sharesSupply[sharesSubject] = supply - amount;
 
+        uint256 divisor;
+        uint256 curveIndex = subjectCurve[sharesSubject];
+
+        if (curveIndex == 1) {
+            divisor = divisor1;
+        } else if (curveIndex == 2) {
+            divisor = divisor2;
+        } else if (curveIndex == 3) {
+            divisor = divisor3;
+        } else {
+            divisor = divisor1; // Default to first curve
+        }
+
         emit Trade(
             msg.sender,
             sharesSubject,
@@ -212,7 +241,8 @@ contract BackroomShares is Ownable {
             price,
             protocolFee,
             subjectFee,
-            supply - amount
+            supply - amount,
+            divisor
         );
 
         ERC20(token).safeTransfer(msg.sender, price - protocolFee - subjectFee);

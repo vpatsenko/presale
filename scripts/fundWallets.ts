@@ -36,9 +36,9 @@ function parseWalletsCSV(csvContent: string): WalletData[] {
 async function main(): Promise<void> {
     console.log("💰 Starting wallet funding process...\n");
     
-    // Check if admin mnemonic is set
-    if (!process.env.ADMIN_MNEMONIC) {
-        console.error("❌ ADMIN_MNEMONIC not found in .env file");
+    // Check if admin private key is set
+    if (!process.env.ADMIN_PRIVATE_KEY) {
+        console.error("❌ ADMIN_PRIVATE_KEY not found in .env file");
         process.exit(1);
     }
     
@@ -55,7 +55,7 @@ async function main(): Promise<void> {
     console.log(`📊 Found ${wallets.length} wallets to fund`);
     
     // Setup admin wallet
-    const adminWallet = ethers.Wallet.fromPhrase(process.env.ADMIN_MNEMONIC);
+    const adminWallet = new ethers.Wallet(process.env.ADMIN_PRIVATE_KEY);
     const provider = ethers.provider;
     const adminSigner = adminWallet.connect(provider);
     

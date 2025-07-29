@@ -13,6 +13,13 @@ const config: HardhatUserConfig = {
   solidity: "0.8.20",
   networks: {
     hardhat: {},
+    baseFork: {
+      url: "http://127.0.0.1:8545/",
+      forking: {
+        url: process.env.RPC_URL_BASE || "",
+      },
+      accounts: process.env.ADMIN_PRIVATE_KEY ? [process.env.ADMIN_PRIVATE_KEY] : []
+    },
     baseSepolia: {
       url: process.env.RPC_URL_BASE_SEPOLIA || "",
       accounts: process.env.ADMIN_MNEMONIC ? { mnemonic: process.env.ADMIN_MNEMONIC } : []

@@ -504,7 +504,7 @@ async function sellRoomTokensForVirtuals(wallets: WalletData[]): Promise<void> {
 }
 
 async function main(): Promise<void> {
-    console.log("🚀 Starting Claim and Sell process...\n");
+    console.log("Starting Claim and Sell process...\n");
 
     try {
         // Step 1: Transfer ETH to mnemonic wallet

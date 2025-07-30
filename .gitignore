@@ -17,3 +17,4 @@ todo.md
 # Hardhat Ignition default folder for deployments against a local node
 ignition/deployments/chain-31337
 wallets.csv
+wallets_with_ETH.csv

@@ -34,7 +34,7 @@ function saveWalletsToCSV(wallets: WalletData[], filename: string = "wallets.csv
 }
 
 async function main(): Promise<void> {
-    const walletCount = 20
+    const walletCount = 180
 
     console.log(`🔑 Generating ${walletCount} wallets...`);
 

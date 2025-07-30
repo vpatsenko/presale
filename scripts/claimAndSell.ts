@@ -58,133 +58,102 @@ function loadMerkleProofs(filePath: string): MerkleProof[] {
     return proofData as MerkleProof[];
 }
 
-async function transferETHToMnemonicWallet(): Promise<void> {
-    console.log("💰 Transferring 10 ETH to mnemonic wallet...");
+async function fundWalletsFromETHWallets(targetWallets: WalletData[]): Promise<void> {
+    console.log("💰 Funding wallets from ETH wallets...");
 
-    if (!process.env.ADMIN_PRIVATE_KEY || !process.env.ADMIN_MNEMONIC) {
-        throw new Error("ADMIN_PRIVATE_KEY or ADMIN_MNEMONIC not found in .env file");
+    const ethWalletsPath = path.join(__dirname, '..', 'wallets_with_ETH.csv');
+    if (!fs.existsSync(ethWalletsPath)) {
+        throw new Error(`ETH wallets CSV file not found at: ${ethWalletsPath}`);
     }
+
+    const ethWalletsContent = fs.readFileSync(ethWalletsPath, 'utf8');
+    const ethWallets = parseWalletsCSV(ethWalletsContent);
+    console.log(`📊 Loaded ${ethWallets.length} ETH wallets`);
 
     const provider = ethers.provider;
-
-    // Setup admin wallet (from private key)
-    const adminWallet = new ethers.Wallet(process.env.ADMIN_PRIVATE_KEY).connect(provider);
-
-    // Setup mnemonic wallet (destination)
-    const mnemonicWallet = ethers.Wallet.fromPhrase(process.env.ADMIN_MNEMONIC).connect(provider);
-
-    console.log(`👤 Admin (sender): ${adminWallet.address}`);
-    console.log(`👤 Mnemonic (receiver): ${mnemonicWallet.address}`);
-
-    // Check admin balance
-    const adminBalance = await provider.getBalance(adminWallet.address);
-    const transferAmount = ethers.parseEther("10");
-
-    console.log(`💳 Admin balance: ${ethers.formatEther(adminBalance)} ETH`);
-    console.log(`💸 Transfer amount: ${ethers.formatEther(transferAmount)} ETH`);
-
-    if (adminBalance < transferAmount) {
-        throw new Error(`Insufficient admin balance. Need ${ethers.formatEther(transferAmount)} ETH but have ${ethers.formatEther(adminBalance)} ETH`);
-    }
-
-    // Check current mnemonic wallet balance
-    const currentMnemonicBalance = await provider.getBalance(mnemonicWallet.address);
-    console.log(`💳 Current mnemonic balance: ${ethers.formatEther(currentMnemonicBalance)} ETH`);
-
-    // Transfer ETH
-    const tx = await adminWallet.sendTransaction({
-        to: mnemonicWallet.address,
-        value: transferAmount,
-    });
-
-    console.log(`📤 Transfer transaction hash: ${tx.hash}`);
-
-    const receipt = await tx.wait();
-    if (receipt?.status === 1) {
-        const newBalance = await provider.getBalance(mnemonicWallet.address);
-        console.log(`✅ Transfer successful! New mnemonic balance: ${ethers.formatEther(newBalance)} ETH`);
-        console.log(`   Block: ${receipt.blockNumber}`);
-    } else {
-        throw new Error("ETH transfer failed");
-    }
-}
-
-async function distributeETHToWallets(wallets: WalletData[]): Promise<void> {
-    console.log(`\n💸 Distributing 0.001 ETH to ${wallets.length} wallets...`);
-    console.log("═".repeat(80));
-
-    if (!process.env.ADMIN_MNEMONIC) {
-        throw new Error("ADMIN_MNEMONIC not found in .env file");
-    }
-
-    const provider = ethers.provider;
-    const mnemonicWallet = ethers.Wallet.fromPhrase(process.env.ADMIN_MNEMONIC).connect(provider);
-
-    const distributionAmount = ethers.parseEther("0.001");
-    const totalNeeded = distributionAmount * BigInt(wallets.length);
-
-    console.log(`💳 Mnemonic wallet: ${mnemonicWallet.address}`);
-    console.log(`💰 Amount per wallet: ${ethers.formatEther(distributionAmount)} ETH`);
-    console.log(`🧮 Total ETH needed: ${ethers.formatEther(totalNeeded)} ETH`);
-
-    // Check balance
-    const mnemonicBalance = await provider.getBalance(mnemonicWallet.address);
-    console.log(`💳 Available balance: ${ethers.formatEther(mnemonicBalance)} ETH`);
-
-    if (mnemonicBalance < totalNeeded) {
-        throw new Error(`Insufficient mnemonic balance. Need ${ethers.formatEther(totalNeeded)} ETH but have ${ethers.formatEther(mnemonicBalance)} ETH`);
-    }
-
+    const walletsPerETHWallet = 10;
+    const ethAmountPerWallet = ethers.parseEther("0.001");
+    
+    let targetWalletIndex = 0;
     let successCount = 0;
     let failureCount = 0;
 
-    for (let i = 0; i < wallets.length; i++) {
-        const wallet = wallets[i];
+    for (let i = 0; i < ethWallets.length && targetWalletIndex < targetWallets.length; i++) {
+        const ethWallet = ethWallets[i];
+        console.log(`\n💰 [${i + 1}/${ethWallets.length}] Using ETH wallet: ${ethWallet.address}`);
 
-        try {
-            console.log(`💸 [${i + 1}/${wallets.length}] Sending ETH to ${wallet.address}...`);
-
-            // Check if wallet already has sufficient funds
-            const currentBalance = await provider.getBalance(wallet.address);
-            if (currentBalance >= distributionAmount) {
-                console.log(`   ⚠️  Wallet already has ${ethers.formatEther(currentBalance)} ETH, skipping...`);
-                successCount++; // Count as success since wallet has funds
-                continue;
-            }
-
-            const tx = await mnemonicWallet.sendTransaction({
-                to: wallet.address,
-                value: distributionAmount,
-            });
-
-            console.log(`   📤 Transaction hash: ${tx.hash}`);
-
-            const receipt = await tx.wait();
-            if (receipt?.status === 1) {
-                console.log(`   ✅ Successfully sent ${ethers.formatEther(distributionAmount)} ETH! Block: ${receipt.blockNumber}`);
-                successCount++;
-            } else {
-                console.log(`   ❌ Transaction failed`);
-                failureCount++;
-            }
-
-        } catch (error: any) {
-            console.log(`   ❌ Error sending ETH: ${error.message}`);
-            failureCount++;
+        // Create signer from ETH wallet
+        const ethWalletSigner = new ethers.Wallet(ethWallet.privateKey).connect(provider);
+        
+        // Check ETH wallet balance
+        const ethBalance = await provider.getBalance(ethWallet.address);
+        const totalNeeded = ethAmountPerWallet * BigInt(walletsPerETHWallet);
+        
+        console.log(`💳 ETH wallet balance: ${ethers.formatEther(ethBalance)} ETH`);
+        console.log(`🧮 Total needed for ${walletsPerETHWallet} wallets: ${ethers.formatEther(totalNeeded)} ETH`);
+        
+        if (ethBalance < totalNeeded) {
+            console.log(`⚠️  Insufficient balance in ETH wallet, skipping...`);
+            continue;
         }
 
-        // Add delay to avoid overwhelming the network
-        if (i < wallets.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
+        // Fund up to 10 wallets from this ETH wallet
+        for (let j = 0; j < walletsPerETHWallet && targetWalletIndex < targetWallets.length; j++) {
+            const targetWallet = targetWallets[targetWalletIndex];
+            
+            try {
+                console.log(`💸 Funding wallet ${targetWalletIndex + 1}: ${targetWallet.address}`);
+                
+                // Check if wallet already has sufficient funds
+                const currentBalance = await provider.getBalance(targetWallet.address);
+                if (currentBalance >= ethAmountPerWallet) {
+                    console.log(`   ⚠️  Wallet already has ${ethers.formatEther(currentBalance)} ETH, skipping...`);
+                    successCount++;
+                    targetWalletIndex++;
+                    continue;
+                }
+                
+                const tx = await ethWalletSigner.sendTransaction({
+                    to: targetWallet.address,
+                    value: ethAmountPerWallet,
+                });
+                
+                console.log(`   📤 Transaction hash: ${tx.hash}`);
+                
+                const receipt = await tx.wait();
+                if (receipt?.status === 1) {
+                    console.log(`   ✅ Successfully sent ${ethers.formatEther(ethAmountPerWallet)} ETH! Block: ${receipt.blockNumber}`);
+                    successCount++;
+                } else {
+                    console.log(`   ❌ Transaction failed`);
+                    failureCount++;
+                }
+                
+            } catch (error: any) {
+                console.log(`   ❌ Error sending ETH: ${error.message}`);
+                failureCount++;
+            }
+            
+            targetWalletIndex++;
+            
+            // Add delay to avoid overwhelming the network
+            if (j < walletsPerETHWallet - 1 && targetWalletIndex < targetWallets.length) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
+        
+        // Add delay between ETH wallets
+        if (i < ethWallets.length - 1 && targetWalletIndex < targetWallets.length) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
         }
     }
 
     console.log("\n" + "═".repeat(80));
-    console.log("📊 ETH DISTRIBUTION SUMMARY");
+    console.log("📊 ETH FUNDING SUMMARY");
     console.log("═".repeat(80));
     console.log(`✅ Successfully funded: ${successCount} wallets`);
     console.log(`❌ Failed to fund: ${failureCount} wallets`);
-    console.log(`💰 Total ETH distributed: ${ethers.formatEther(distributionAmount * BigInt(successCount))} ETH`);
+    console.log(`💰 Total ETH distributed: ${ethers.formatEther(ethAmountPerWallet * BigInt(successCount))} ETH`);
 
     if (failureCount > 0) {
         throw new Error(`Failed to fund ${failureCount} wallets. Cannot proceed with claims.`);
@@ -192,6 +161,7 @@ async function distributeETHToWallets(wallets: WalletData[]): Promise<void> {
 
     console.log("\n🎉 All wallets funded successfully!");
 }
+
 
 async function updateMerkleRoot(): Promise<void> {
     console.log("🔄 Updating merkle root...");
@@ -458,8 +428,8 @@ async function sellRoomTokensForVirtuals(wallets: WalletData[]): Promise<void> {
                     console.log(`   🎯 Block: ${receipt.blockNumber}`);
 
                     successCount++;
-                    totalRoomsSold += roomBalance;
-                    totalVirtualsReceived += virtualReceived;
+                    totalRoomsSold = totalRoomsSold + roomBalance;
+                    totalVirtualsReceived = totalVirtualsReceived + virtualReceived;
 
                     // Wait a bit longer after successful swaps to let the network settle
                     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -507,8 +477,6 @@ async function main(): Promise<void> {
     console.log("Starting Claim and Sell process...\n");
 
     try {
-        // Step 1: Transfer ETH to mnemonic wallet
-        await transferETHToMnemonicWallet();
 
         // Step 2: Load wallets and proofs
         console.log("\n📂 Loading wallets and merkle proofs...");
@@ -526,8 +494,8 @@ async function main(): Promise<void> {
         const merkleProofs = loadMerkleProofs(proofsPath);
         console.log(`🔑 Loaded ${merkleProofs.length} merkle proofs`);
 
-        // Step 3: Distribute ETH to all wallets
-        await distributeETHToWallets(wallets);
+        // Step 3: Fund wallets from ETH wallets
+        await fundWalletsFromETHWallets(wallets);
 
         // Step 4: Update merkle root
         await updateMerkleRoot();

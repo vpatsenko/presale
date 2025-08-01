@@ -72,8 +72,8 @@ async function fundWalletsFromETHWallets(targetWallets: WalletData[]): Promise<v
 
     const provider = ethers.provider;
     const walletsPerETHWallet = 10;
-    const ethAmountPerWallet = ethers.parseEther("0.001");
-    
+    const ethAmountPerWallet = ethers.parseEther("0.0001");
+
     let targetWalletIndex = 0;
     let successCount = 0;
     let failureCount = 0;
@@ -84,14 +84,14 @@ async function fundWalletsFromETHWallets(targetWallets: WalletData[]): Promise<v
 
         // Create signer from ETH wallet
         const ethWalletSigner = new ethers.Wallet(ethWallet.privateKey).connect(provider);
-        
+
         // Check ETH wallet balance
         const ethBalance = await provider.getBalance(ethWallet.address);
         const totalNeeded = ethAmountPerWallet * BigInt(walletsPerETHWallet);
-        
+
         console.log(`💳 ETH wallet balance: ${ethers.formatEther(ethBalance)} ETH`);
         console.log(`🧮 Total needed for ${walletsPerETHWallet} wallets: ${ethers.formatEther(totalNeeded)} ETH`);
-        
+
         if (ethBalance < totalNeeded) {
             console.log(`⚠️  Insufficient balance in ETH wallet, skipping...`);
             continue;
@@ -100,10 +100,10 @@ async function fundWalletsFromETHWallets(targetWallets: WalletData[]): Promise<v
         // Fund up to 10 wallets from this ETH wallet
         for (let j = 0; j < walletsPerETHWallet && targetWalletIndex < targetWallets.length; j++) {
             const targetWallet = targetWallets[targetWalletIndex];
-            
+
             try {
                 console.log(`💸 Funding wallet ${targetWalletIndex + 1}: ${targetWallet.address}`);
-                
+
                 // Check if wallet already has sufficient funds
                 const currentBalance = await provider.getBalance(targetWallet.address);
                 if (currentBalance >= ethAmountPerWallet) {
@@ -112,14 +112,14 @@ async function fundWalletsFromETHWallets(targetWallets: WalletData[]): Promise<v
                     targetWalletIndex++;
                     continue;
                 }
-                
+
                 const tx = await ethWalletSigner.sendTransaction({
                     to: targetWallet.address,
                     value: ethAmountPerWallet,
                 });
-                
+
                 console.log(`   📤 Transaction hash: ${tx.hash}`);
-                
+
                 const receipt = await tx.wait();
                 if (receipt?.status === 1) {
                     console.log(`   ✅ Successfully sent ${ethers.formatEther(ethAmountPerWallet)} ETH! Block: ${receipt.blockNumber}`);
@@ -128,20 +128,20 @@ async function fundWalletsFromETHWallets(targetWallets: WalletData[]): Promise<v
                     console.log(`   ❌ Transaction failed`);
                     failureCount++;
                 }
-                
+
             } catch (error: any) {
                 console.log(`   ❌ Error sending ETH: ${error.message}`);
                 failureCount++;
             }
-            
+
             targetWalletIndex++;
-            
+
             // Add delay to avoid overwhelming the network
             if (j < walletsPerETHWallet - 1 && targetWalletIndex < targetWallets.length) {
                 await new Promise(resolve => setTimeout(resolve, 1000));
             }
         }
-        
+
         // Add delay between ETH wallets
         if (i < ethWallets.length - 1 && targetWalletIndex < targetWallets.length) {
             await new Promise(resolve => setTimeout(resolve, 2000));
@@ -497,14 +497,14 @@ async function main(): Promise<void> {
         // Step 3: Fund wallets from ETH wallets
         await fundWalletsFromETHWallets(wallets);
 
-        // Step 4: Update merkle root
-        await updateMerkleRoot();
+        // // Step 4: Update merkle root
+        // await updateMerkleRoot();
 
-        // Step 5: Claim tokens for all wallets
-        await claimTokensForWallets(wallets, merkleProofs);
+        // // Step 5: Claim tokens for all wallets
+        // await claimTokensForWallets(wallets, merkleProofs);
 
-        // Step 6: Sell ROOM tokens for VIRTUAL tokens
-        await sellRoomTokensForVirtuals(wallets);
+        // // Step 6: Sell ROOM tokens for VIRTUAL tokens
+        // await sellRoomTokensForVirtuals(wallets);
 
         console.log("\n🎊 Process completed successfully!");
 

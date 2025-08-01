@@ -81,7 +81,6 @@ async function distributeTokensFromAdmin(allocations: PresaleAllocation[]): Prom
 
     const provider = ethers.provider;
     const adminWallet = ethers.Wallet.fromPhrase(process.env.ADMIN_MNEMONIC).connect(provider);
-
     console.log(`Admin address: ${adminWallet.address}`);
 
     const ERC20_ABI = [
@@ -111,27 +110,26 @@ async function distributeTokensFromAdmin(allocations: PresaleAllocation[]): Prom
         const amount = BigInt(allocation.amount);
 
         try {
-            console.log(`💸 [${i + 1}/${allocations.length}] Sending ${ethers.formatEther(amount)} ROOM to ${allocation.address}...`);
+            console.log(`[${i + 1}/${allocations.length}] Sending ${ethers.formatEther(amount)} ROOM to ${allocation.address}...`);
 
             const tx = await roomToken.transfer(allocation.address, amount);
-            console.log(`   📤 Transaction hash: ${tx.hash}`);
+            console.log(`Transaction hash: ${tx.hash}`);
 
             const receipt = await tx.wait();
             if (receipt?.status === 1) {
-                console.log(`   ✅ Successfully sent! Block: ${receipt.blockNumber}`);
+                console.log(`Successfully sent! Block: ${receipt.blockNumber}`);
                 successCount++;
                 totalDistributed = totalDistributed + amount;
             } else {
-                console.log(`   ❌ Transaction failed`);
+                console.log(` Transaction failed`);
                 failureCount++;
             }
 
         } catch (error: any) {
-            console.log(`   ❌ Error sending tokens: ${error.message}`);
+            console.log(`Error sending tokens: ${error.message}`);
             failureCount++;
         }
 
-        // Add delay to avoid overwhelming the network
         if (i < allocations.length - 1) {
             await new Promise(resolve => setTimeout(resolve, 2000));
         }

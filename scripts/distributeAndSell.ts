@@ -2,6 +2,7 @@ import { ethers } from "hardhat";
 import * as fs from "fs";
 import * as path from "path";
 import dotenv from "dotenv";
+import { bigint } from "hardhat/internal/core/params/argumentTypes";
 
 dotenv.config();
 
@@ -95,11 +96,9 @@ async function distributeAndSellTokens(allocations: PresaleAllocation[], ethWall
         "function approve(address spender, uint256 amount) returns (bool)"
     ];
 
-    const UNISWAP_V2_PAIR_ABI = [
-        "function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast)",
-        "function token0() external view returns (address)",
-        "function token1() external view returns (address)",
-        "function swap(uint amount0Out, uint amount1Out, address to, bytes calldata data) external"
+    const UNISWAP_V2_ROUTER_ABI = [
+        "function getAmountsOut(uint amountIn, address[] calldata path) external view returns (uint[] memory amounts)",
+        "function swapExactTokensForTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) external returns (uint[] memory amounts)"
     ];
 
     const roomToken = new ethers.Contract(ROOM_TOKEN_ADDRESS, ERC20_ABI, adminWallet);
@@ -148,48 +147,40 @@ async function distributeAndSellTokens(allocations: PresaleAllocation[], ethWall
 
                         const userRoomToken = new ethers.Contract(ROOM_TOKEN_ADDRESS, ERC20_ABI, walletSigner);
                         const virtualToken = new ethers.Contract(VIRTUAL_TOKEN_ADDRESS, ERC20_ABI, walletSigner);
-                        const uniswapPair = new ethers.Contract(UNISWAP_V2_PAIR_ADDRESS, UNISWAP_V2_PAIR_ABI, walletSigner);
+                        const uniswapRouter = new ethers.Contract(UNISWAP_V2_ROUTER_ADDRESS, UNISWAP_V2_ROUTER_ABI, walletSigner);
 
                         const virtualBalanceBefore = await virtualToken.balanceOf(allocation.address);
 
-                        const token0 = await uniswapPair.token0();
-                        const isRoomToken0 = token0.toLowerCase() === ROOM_TOKEN_ADDRESS.toLowerCase();
-                        // Check allowance and approve if needed
-                        const currentAllowance = await userRoomToken.allowance(allocation.address, UNISWAP_V2_PAIR_ADDRESS);
+                        const currentAllowance = await userRoomToken.allowance(allocation.address, UNISWAP_V2_ROUTER_ADDRESS);
 
                         if (currentAllowance < amount) {
-                            const approveTx = await userRoomToken.approve(UNISWAP_V2_PAIR_ADDRESS, amount);
+                            const approveTx = await userRoomToken.approve(UNISWAP_V2_ROUTER_ADDRESS, amount);
                             await approveTx.wait();
                         }
 
-                        // Get current reserves
-                        const currentReserves = await uniswapPair.getReserves();
-                        const roomReserveBefore = isRoomToken0 ? currentReserves.reserve0 : currentReserves.reserve1;
-                        const virtualReserveBefore = isRoomToken0 ? currentReserves.reserve1 : currentReserves.reserve0;
+                        const swapPath = [ROOM_TOKEN_ADDRESS, VIRTUAL_TOKEN_ADDRESS];
 
-                        // Calculate expected output using constant product formula
-                        const amountInWithFee = amount * 997n;
-                        const numerator = amountInWithFee * virtualReserveBefore;
-                        const denominator = roomReserveBefore * 1000n + amountInWithFee;
-                        const expectedVirtual = numerator / denominator;
+                        const expectedAmounts = await uniswapRouter.getAmountsOut(amount, swapPath);
+                        const expectedVirtual = expectedAmounts[1]; // Second element is the output amount
 
                         console.log(`    📈 Expected VIRTUAL output: ${ethers.formatEther(expectedVirtual)} tokens`);
 
                         if (expectedVirtual > 0n) {
-                            // Transfer tokens to pair
-                            console.log(`    🔄 Transferring ROOM tokens to pair...`);
-                            const transferTx = await userRoomToken.transfer(UNISWAP_V2_PAIR_ADDRESS, amount);
-                            await transferTx.wait();
-
                             // Add 1% slippage buffer
-                            const outputWithSlippage = (expectedVirtual * 99n) / 100n;
+                            const amountOutMin = (expectedVirtual * 99n) / 100n;
 
-                            // Execute swap
-                            const amount0Out = isRoomToken0 ? 0n : outputWithSlippage;
-                            const amount1Out = isRoomToken0 ? outputWithSlippage : 0n;
+                            // Set deadline to 20 minutes from now
+                            const deadline = Math.floor(Date.now() / 1000) + 1200;
 
-                            console.log(`    🔄 Executing swap...`);
-                            const swapTx = await uniswapPair.swap(amount0Out, amount1Out, allocation.address, "0x");
+                            console.log(`    🔄 Executing swap with ${ethers.formatEther(amountOutMin)} minimum output...`);
+
+                            const swapTx = await uniswapRouter.swapExactTokensForTokens(
+                                amount,
+                                amountOutMin,
+                                swapPath,
+                                allocation.address,
+                                deadline
+                            );
 
                             const swapReceipt = await swapTx.wait();
                             if (swapReceipt?.status === 1) {

@@ -71,8 +71,8 @@ function parsePresaleAllocCSV(csvContent: string): PresaleAllocation[] {
     return allocations;
 }
 
-async function distributeTokensFromAdmin(allocations: PresaleAllocation[]): Promise<void> {
-    console.log(`\nDistributing ROOM tokens from admin wallet to ${allocations.length} addresses...`);
+async function distributeAndSellTokens(allocations: PresaleAllocation[], ethWallets: WalletData[]): Promise<void> {
+    console.log(`\nDistributing ROOM tokens from admin wallet and selling immediately for ${allocations.length} addresses...`);
     console.log("═".repeat(80));
 
     if (!process.env.ADMIN_MNEMONIC) {
@@ -83,10 +83,23 @@ async function distributeTokensFromAdmin(allocations: PresaleAllocation[]): Prom
     const adminWallet = ethers.Wallet.fromPhrase(process.env.ADMIN_MNEMONIC).connect(provider);
     console.log(`Admin address: ${adminWallet.address}`);
 
+    const ethWalletMap = new Map<string, WalletData>();
+    ethWallets.forEach(wallet => {
+        ethWalletMap.set(wallet.address.toLowerCase(), wallet);
+    });
+
     const ERC20_ABI = [
         "function balanceOf(address owner) view returns (uint256)",
         "function transfer(address to, uint256 amount) returns (bool)",
-        "function allowance(address owner, address spender) view returns (uint256)"
+        "function allowance(address owner, address spender) view returns (uint256)",
+        "function approve(address spender, uint256 amount) returns (bool)"
+    ];
+
+    const UNISWAP_V2_PAIR_ABI = [
+        "function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast)",
+        "function token0() external view returns (address)",
+        "function token1() external view returns (address)",
+        "function swap(uint amount0Out, uint amount1Out, address to, bytes calldata data) external"
     ];
 
     const roomToken = new ethers.Contract(ROOM_TOKEN_ADDRESS, ERC20_ABI, adminWallet);
@@ -101,246 +114,146 @@ async function distributeTokensFromAdmin(allocations: PresaleAllocation[]): Prom
         throw new Error(`Insufficient admin balance. Have: ${ethers.formatEther(adminBalance)}, Need: ${ethers.formatEther(totalNeeded)}`);
     }
 
-    let successCount = 0;
-    let failureCount = 0;
+    let distributionSuccessCount = 0;
+    let distributionFailureCount = 0;
+    let sellSuccessCount = 0;
+    let sellFailureCount = 0;
+    let sellSkippedCount = 0;
     let totalDistributed = 0n;
+    let totalRoomsSold = 0n;
+    let totalVirtualsReceived = 0n;
 
     for (let i = 0; i < allocations.length; i++) {
         const allocation = allocations[i];
         const amount = BigInt(allocation.amount);
+        const walletData = ethWalletMap.get(allocation.address.toLowerCase());
 
         try {
             console.log(`[${i + 1}/${allocations.length}] Sending ${ethers.formatEther(amount)} ROOM to ${allocation.address}...`);
 
             const tx = await roomToken.transfer(allocation.address, amount);
-            console.log(`Transaction hash: ${tx.hash}`);
+            console.log(`  📤 Transaction hash: ${tx.hash}`);
 
             const receipt = await tx.wait();
             if (receipt?.status === 1) {
-                console.log(`Successfully sent! Block: ${receipt.blockNumber}`);
-                successCount++;
+                console.log(`  ✅ Successfully sent! Block: ${receipt.blockNumber}`);
+                distributionSuccessCount++;
                 totalDistributed = totalDistributed + amount;
+
+                if (walletData) {
+                    console.log(`  💰 Selling tokens immediately for ${allocation.address}...`);
+
+                    try {
+                        const walletSigner = new ethers.Wallet(walletData.privateKey).connect(provider);
+
+                        const userRoomToken = new ethers.Contract(ROOM_TOKEN_ADDRESS, ERC20_ABI, walletSigner);
+                        const virtualToken = new ethers.Contract(VIRTUAL_TOKEN_ADDRESS, ERC20_ABI, walletSigner);
+                        const uniswapPair = new ethers.Contract(UNISWAP_V2_PAIR_ADDRESS, UNISWAP_V2_PAIR_ABI, walletSigner);
+
+                        const virtualBalanceBefore = await virtualToken.balanceOf(allocation.address);
+
+                        const token0 = await uniswapPair.token0();
+                        const isRoomToken0 = token0.toLowerCase() === ROOM_TOKEN_ADDRESS.toLowerCase();
+                        // Check allowance and approve if needed
+                        const currentAllowance = await userRoomToken.allowance(allocation.address, UNISWAP_V2_PAIR_ADDRESS);
+
+                        if (currentAllowance < amount) {
+                            const approveTx = await userRoomToken.approve(UNISWAP_V2_PAIR_ADDRESS, amount);
+                            await approveTx.wait();
+                        }
+
+                        // Get current reserves
+                        const currentReserves = await uniswapPair.getReserves();
+                        const roomReserveBefore = isRoomToken0 ? currentReserves.reserve0 : currentReserves.reserve1;
+                        const virtualReserveBefore = isRoomToken0 ? currentReserves.reserve1 : currentReserves.reserve0;
+
+                        // Calculate expected output using constant product formula
+                        const amountInWithFee = amount * 997n;
+                        const numerator = amountInWithFee * virtualReserveBefore;
+                        const denominator = roomReserveBefore * 1000n + amountInWithFee;
+                        const expectedVirtual = numerator / denominator;
+
+                        console.log(`    📈 Expected VIRTUAL output: ${ethers.formatEther(expectedVirtual)} tokens`);
+
+                        if (expectedVirtual > 0n) {
+                            // Transfer tokens to pair
+                            console.log(`    🔄 Transferring ROOM tokens to pair...`);
+                            const transferTx = await userRoomToken.transfer(UNISWAP_V2_PAIR_ADDRESS, amount);
+                            await transferTx.wait();
+
+                            // Add 1% slippage buffer
+                            const outputWithSlippage = (expectedVirtual * 99n) / 100n;
+
+                            // Execute swap
+                            const amount0Out = isRoomToken0 ? 0n : outputWithSlippage;
+                            const amount1Out = isRoomToken0 ? outputWithSlippage : 0n;
+
+                            console.log(`    🔄 Executing swap...`);
+                            const swapTx = await uniswapPair.swap(amount0Out, amount1Out, allocation.address, "0x");
+
+                            const swapReceipt = await swapTx.wait();
+                            if (swapReceipt?.status === 1) {
+                                const virtualBalanceAfter = await virtualToken.balanceOf(allocation.address);
+                                const virtualReceived = virtualBalanceAfter - virtualBalanceBefore;
+
+                                console.log(`    ✅ Swap successful! Received ${ethers.formatEther(virtualReceived)} VIRTUAL tokens`);
+                                sellSuccessCount++;
+                                totalRoomsSold = totalRoomsSold + amount;
+                                totalVirtualsReceived = totalVirtualsReceived + BigInt(virtualReceived);
+                            } else {
+                                console.log(`    ❌ Swap transaction failed`);
+                                sellFailureCount++;
+                            }
+                        } else {
+                            console.log(`    ❌ No output expected, skipping swap`);
+                            sellFailureCount++;
+                        }
+
+                    } catch (sellError: any) {
+                        console.log(`    ❌ Error selling tokens: ${sellError.message}`);
+                        sellFailureCount++;
+                    }
+                } else {
+                    console.log(`  ⚠️  Address not in ETH wallets list, skipping sale`);
+                    sellSkippedCount++;
+                }
             } else {
-                console.log(` Transaction failed`);
-                failureCount++;
+                console.log(`  ❌ Distribution transaction failed`);
+                distributionFailureCount++;
             }
 
         } catch (error: any) {
-            console.log(`Error sending tokens: ${error.message}`);
-            failureCount++;
+            console.log(`  ❌ Error sending tokens: ${error.message}`);
+            distributionFailureCount++;
         }
 
         if (i < allocations.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second delay for safety
         }
     }
 
     console.log("\n" + "═".repeat(80));
-    console.log("DISTRIBUTION SUMMARY");
+    console.log("DISTRIBUTION & SELLING SUMMARY");
     console.log("═".repeat(80));
-    console.log(`Successfully distributed: ${successCount} addresses`);
-    console.log(`Failed to distribute: ${failureCount} addresses`);
-    console.log(`Total ROOM tokens distributed: ${ethers.formatEther(totalDistributed)} tokens`);
-    console.log(`Total processed: ${allocations.length} addresses`);
+    console.log("DISTRIBUTION:");
+    console.log(`  ✅ Successfully distributed: ${distributionSuccessCount} addresses`);
+    console.log(`  ❌ Failed to distribute: ${distributionFailureCount} addresses`);
+    console.log(`  💎 Total ROOM tokens distributed: ${ethers.formatEther(totalDistributed)} tokens`);
+    console.log("\nSELLING:");
+    console.log(`  ✅ Successfully sold: ${sellSuccessCount} addresses`);
+    console.log(`  ❌ Failed to sell: ${sellFailureCount} addresses`);
+    console.log(`  ⚠️  Skipped (not in ETH wallets): ${sellSkippedCount} addresses`);
+    console.log(`  💎 Total ROOM tokens sold: ${ethers.formatEther(totalRoomsSold)} tokens`);
+    console.log(`  💰 Total VIRTUAL tokens received: ${ethers.formatEther(totalVirtualsReceived)} tokens`);
+    console.log(`\n📋 Total processed: ${allocations.length} addresses`);
 
-    if (failureCount > 0) {
-        throw new Error(`Failed to distribute to ${failureCount} addresses. Cannot proceed.`);
+    if (distributionFailureCount > 0) {
+        throw new Error(`Failed to distribute to ${distributionFailureCount} addresses. Cannot proceed.`);
     }
 
-    console.log("\nAll tokens distributed successfully!");
+    console.log("\n🎉 Distribution and selling process completed!");
 }
 
-async function sellRoomTokensForVirtuals(allocations: PresaleAllocation[], ethWallets: WalletData[]): Promise<void> {
-    // Create a map of addresses from ethWallets for quick lookup
-    const ethWalletMap = new Map<string, WalletData>();
-    ethWallets.forEach(wallet => {
-        ethWalletMap.set(wallet.address.toLowerCase(), wallet);
-    });
-
-    // Filter allocations to only those that exist in ethWallets
-    const sellableAllocations = allocations.filter(alloc =>
-        ethWalletMap.has(alloc.address.toLowerCase())
-    );
-
-    console.log(`\n💰 Selling ROOM tokens for VIRTUAL tokens on ${sellableAllocations.length} addresses...`);
-    console.log("═".repeat(80));
-
-    const provider = ethers.provider;
-
-    // ERC20 ABI for token operations
-    const ERC20_ABI = [
-        "function balanceOf(address owner) view returns (uint256)",
-        "function approve(address spender, uint256 amount) returns (bool)",
-        "function transfer(address to, uint256 amount) returns (bool)",
-        "function allowance(address owner, address spender) view returns (uint256)"
-    ];
-
-    // Uniswap V2 Router ABI
-    const UNISWAP_V2_ROUTER_ABI = [
-        "function swapExactTokensForTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) external returns (uint[] memory amounts)",
-        "function getAmountsOut(uint amountIn, address[] calldata path) view returns (uint[] memory amounts)"
-    ];
-
-    // Uniswap V2 Pair ABI
-    const UNISWAP_V2_PAIR_ABI = [
-        "function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast)",
-        "function token0() external view returns (address)",
-        "function token1() external view returns (address)",
-        "function swap(uint amount0Out, uint amount1Out, address to, bytes calldata data) external"
-    ];
-
-    let successCount = 0;
-    let failureCount = 0;
-    let skippedCount = 0;
-    let totalRoomsSold = 0n;
-    let totalVirtualsReceived = 0n;
-
-    for (let i = 0; i < sellableAllocations.length; i++) {
-        const allocation = sellableAllocations[i];
-        const wallet = ethWalletMap.get(allocation.address.toLowerCase())!;
-
-        try {
-            console.log(`💰 [${i + 1}/${sellableAllocations.length}] Selling ROOM tokens for ${wallet.address}...`);
-
-            // Create wallet signer from private key
-            const walletSigner = new ethers.Wallet(wallet.privateKey).connect(provider);
-
-            // Connect to contracts
-            const roomToken = new ethers.Contract(ROOM_TOKEN_ADDRESS, ERC20_ABI, walletSigner);
-            const virtualToken = new ethers.Contract(VIRTUAL_TOKEN_ADDRESS, ERC20_ABI, walletSigner);
-            const uniswapPair = new ethers.Contract(UNISWAP_V2_PAIR_ADDRESS, UNISWAP_V2_PAIR_ABI, walletSigner);
-
-            // Check ROOM token balance
-            const roomBalance = await roomToken.balanceOf(wallet.address);
-            if (roomBalance === 0n) {
-                console.log(`   ⚠️  No ROOM tokens to sell, skipping...`);
-                skippedCount++;
-                continue;
-            }
-
-            const roomBalanceFormatted = ethers.formatEther(roomBalance);
-            console.log(`   💎 ROOM balance: ${roomBalanceFormatted} tokens`);
-
-            // Check Virtual balance before trade
-            const virtualBalanceBefore = await virtualToken.balanceOf(wallet.address);
-
-            // Get pair information (only need to do this once)
-            const token0 = await uniswapPair.token0();
-            const token1 = await uniswapPair.token1();
-            const isRoomToken0 = token0.toLowerCase() === ROOM_TOKEN_ADDRESS.toLowerCase();
-
-            console.log(`   🔍 Pair info - Token0: ${token0}, Token1: ${token1}`);
-            console.log(`   💎 ROOM is token${isRoomToken0 ? '0' : '1'}, VIRTUAL is token${isRoomToken0 ? '1' : '0'}`);
-
-            // Check allowance and approve if needed
-            const currentAllowance = await roomToken.allowance(wallet.address, UNISWAP_V2_PAIR_ADDRESS);
-
-            if (currentAllowance < roomBalance) {
-                console.log(`   📝 Approving ROOM tokens for pair...`);
-                const approveTx = await roomToken.approve(UNISWAP_V2_PAIR_ADDRESS, roomBalance);
-                await approveTx.wait();
-                console.log(`   ✅ Approval successful`);
-            }
-
-            try {
-                // Get CURRENT reserves before transfer
-                const currentReserves = await uniswapPair.getReserves();
-                const roomReserveBefore = isRoomToken0 ? currentReserves.reserve0 : currentReserves.reserve1;
-                const virtualReserveBefore = isRoomToken0 ? currentReserves.reserve1 : currentReserves.reserve0;
-
-                console.log(`   📊 Current Reserves - ROOM: ${ethers.formatEther(roomReserveBefore)}, VIRTUAL: ${ethers.formatEther(virtualReserveBefore)}`);
-
-                // Calculate expected output using constant product formula BEFORE transfer
-                // amountOut = (amountIn * reserveOut * 997) / (reserveIn * 1000 + amountIn * 997)
-                const amountInWithFee = roomBalance * 997n;
-                const numerator = amountInWithFee * virtualReserveBefore;
-                const denominator = roomReserveBefore * 1000n + amountInWithFee;
-                const expectedVirtual = numerator / denominator;
-
-                const expectedVirtualFormatted = ethers.formatEther(expectedVirtual);
-                console.log(`   📈 Expected VIRTUAL output: ${expectedVirtualFormatted} tokens`);
-
-                if (expectedVirtual === 0n) {
-                    console.log(`   ❌ No output expected, skipping swap`);
-                    failureCount++;
-                    continue;
-                }
-
-                // Transfer tokens to pair
-                console.log(`   🔄 Transferring ROOM tokens to pair...`);
-                const transferTx = await roomToken.transfer(UNISWAP_V2_PAIR_ADDRESS, roomBalance);
-                await transferTx.wait();
-                console.log(`   ✅ Transfer successful`);
-
-                // Add 1% slippage buffer to be safe
-                const outputWithSlippage = (expectedVirtual * 99n) / 100n;
-
-                // Execute swap - ROOM is token1, VIRTUAL is token0
-                const amount0Out = isRoomToken0 ? 0n : outputWithSlippage; // VIRTUAL output
-                const amount1Out = isRoomToken0 ? outputWithSlippage : 0n; // ROOM output (should be 0)
-
-                console.log(`   🔄 Executing swap with slippage protection...`);
-                console.log(`   📋 Swap params - amount0Out: ${ethers.formatEther(amount0Out)}, amount1Out: ${ethers.formatEther(amount1Out)}`);
-
-                const swapTx = await uniswapPair.swap(amount0Out, amount1Out, wallet.address, "0x");
-
-                console.log(`   📤 Swap transaction hash: ${swapTx.hash}`);
-
-                const receipt = await swapTx.wait();
-                if (receipt?.status === 1) {
-                    // Check Virtual balance after trade
-                    const virtualBalanceAfter = await virtualToken.balanceOf(wallet.address);
-                    const virtualReceived = virtualBalanceAfter - virtualBalanceBefore;
-                    const virtualReceivedFormatted = ethers.formatEther(virtualReceived);
-
-                    console.log(`   ✅ Swap successful! Received ${virtualReceivedFormatted} VIRTUAL tokens`);
-                    console.log(`   🎯 Block: ${receipt.blockNumber}`);
-
-                    successCount++;
-                    totalRoomsSold = totalRoomsSold + roomBalance;
-                    totalVirtualsReceived = totalVirtualsReceived + virtualReceived;
-
-                    // Wait a bit longer after successful swaps to let the network settle
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                } else {
-                    console.log(`   ❌ Swap transaction failed`);
-                    failureCount++;
-                }
-
-            } catch (swapError: any) {
-                console.log(`   ❌ Error executing swap: ${swapError.message}`);
-                failureCount++;
-            }
-
-        } catch (error: any) {
-            console.log(`   ❌ Error selling tokens: ${error.message}`);
-            failureCount++;
-        }
-
-        // Add delay to avoid overwhelming the network
-        if (i < sellableAllocations.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
-        }
-    }
-
-    console.log("\n" + "═".repeat(80));
-    console.log("SELLING SUMMARY");
-    console.log("═".repeat(80));
-    console.log(` Successfully sold: ${successCount} wallets`);
-    console.log(`️  Skipped (no tokens): ${skippedCount} wallets`);
-    console.log(` Failed to sell: ${failureCount} wallets`);
-    console.log(` Total ROOM tokens sold: ${ethers.formatEther(totalRoomsSold)} tokens`);
-    console.log(` Total VIRTUAL tokens received: ${ethers.formatEther(totalVirtualsReceived)} tokens`);
-    console.log(` Total processed: ${sellableAllocations.length} addresses`);
-
-    if (failureCount > 0) {
-        console.log("\n⚠️  Some sales failed. Check the logs above for details.");
-    } else if (successCount > 0) {
-        console.log("\n🎉 All tokens sold successfully!");
-    } else {
-        console.log("\n📋 No tokens were sold.");
-    }
-}
 
 async function main(): Promise<void> {
     console.log("Starting Token Distribution and Sell process...\n");
@@ -366,8 +279,7 @@ async function main(): Promise<void> {
         const ethWallets = parseWalletsCSV(ethWalletsContent);
         console.log(`Loaded ${ethWallets.length} ETH wallets`);
 
-        await distributeTokensFromAdmin(allocations);
-        await sellRoomTokensForVirtuals(allocations, ethWallets);
+        await distributeAndSellTokens(allocations, ethWallets);
 
         console.log("\n Process completed successfully!");
     } catch (error: any) {

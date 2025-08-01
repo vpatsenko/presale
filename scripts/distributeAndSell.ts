@@ -23,14 +23,10 @@ interface PresaleAllocation {
     amount: string;
 }
 
-const MERKLE_DISTRIBUTOR_ADDRESS = "0xc08392d15c6efafa126364b0ddd4c18b82a1369e";
-const NEW_MERKLE_ROOT = "0xe410724baa4bcc0e8868d198337db02ef31f3c026568ac4c617970725926d866";
-
-// Uniswap V2 trading constants
 const UNISWAP_V2_PAIR_ADDRESS = "0xB4c4e80abE1C807B8f30ac72c9420dD6acEcE8d5";
 const ROOM_TOKEN_ADDRESS = "0x6555255b8dEd3c538Cb398d9E36769f45D7d3ea7";
 const VIRTUAL_TOKEN_ADDRESS = "0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b";
-const UNISWAP_V2_ROUTER_ADDRESS = "0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24"; // Base network Uniswap V2 Router
+const UNISWAP_V2_ROUTER_ADDRESS = "0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24";
 
 function parseWalletsCSV(csvContent: string): WalletData[] {
     const lines = csvContent.trim().split('\n');
@@ -97,11 +93,10 @@ async function distributeTokensFromAdmin(allocations: PresaleAllocation[]): Prom
     const roomToken = new ethers.Contract(ROOM_TOKEN_ADDRESS, ERC20_ABI, adminWallet);
 
     const adminBalance = await roomToken.balanceOf(adminWallet.address);
-    console.log(`💰 Admin ROOM balance: ${ethers.formatEther(adminBalance)} tokens`);
+    console.log(`Admin ROOM balance: ${ethers.formatEther(adminBalance)} tokens`);
 
-    // Calculate total tokens needed
     const totalNeeded = allocations.reduce((sum, alloc) => sum + BigInt(alloc.amount), 0n);
-    console.log(`📊 Total tokens needed: ${ethers.formatEther(totalNeeded)} tokens`);
+    console.log(`Total tokens needed: ${ethers.formatEther(totalNeeded)} tokens`);
 
     if (adminBalance < totalNeeded) {
         throw new Error(`Insufficient admin balance. Have: ${ethers.formatEther(adminBalance)}, Need: ${ethers.formatEther(totalNeeded)}`);

@@ -32,13 +32,13 @@ describe("Backroom", function () {
 			protocolFeePercent,
 			subjectFeePercent,
 			await testToken.getAddress(),
-			16000n, // divisor1
-			32000n, // divisor2
-			8000n   // divisor3
+			5n, // multiplier1
+			10n, // multiplier2
+			20n   // multiplier3
 		);
 		await backroom.waitForDeployment();
 
-		const tokenAmount = ethers.parseEther("1000");
+		const tokenAmount = ethers.parseEther("100000");
 
 		await testToken.transfer(buyer.address, tokenAmount);
 		await testToken.transfer(jhon.address, tokenAmount);

@@ -125,9 +125,8 @@ describe("Backroom", function () {
 
 		it("Should allow buying shares after first share exists with ERC20", async function () {
 			const firstAmount = 1n;
-			const firstPrice = await backroom.getBuyPriceAfterFee(subject.address, firstAmount);
-			await testToken.connect(subject).approve(await backroom.getAddress(), firstPrice);
-			await backroom.connect(subject).buyShares(subject.address, firstAmount, 1);
+
+			await backroom.connect(subject).buyShares(subject.address, firstAmount, 3);
 
 			const amount = 2n;
 			const price = await backroom.getBuyPriceAfterFee(subject.address, amount);
@@ -170,13 +169,13 @@ describe("Backroom", function () {
 			await backroom.connect(subject).buyShares(subject.address, buyAmountBySubject, 1);
 
 
-			const buyAmountByBuyer = 200n;
+			const buyAmountByBuyer = 2n;
 			const buyPriceByBuyer = await backroom.getBuyPriceAfterFee(subject.address, buyAmountByBuyer);
 
 			await testToken.connect(buyer).approve(await backroom.getAddress(), buyPriceByBuyer);
 			await backroom.connect(buyer).buyShares(subject.address, buyAmountByBuyer, 1);
 
-			const sellAmountByBuyer = 200n;
+			const sellAmountByBuyer = 2n;
 			const sellPriceByBuyer = await backroom.getSellPriceAfterFee(subject.address, sellAmountByBuyer);
 
 			const initialBuyerBalance = await testToken.balanceOf(buyer.address);
@@ -217,7 +216,7 @@ describe("Backroom", function () {
 			await testToken.connect(subject).approve(await backroom.getAddress(), buyPriceBySubject);
 			await backroom.connect(subject).buyShares(subject.address, buyAmountBySubject, 1);
 
-			const buyAmountByBuyer = 200n;
+			const buyAmountByBuyer = 2n;
 			const buyPriceByBuyer = await backroom.getBuyPriceAfterFee(subject.address, buyAmountByBuyer);
 			await testToken.connect(buyer).approve(await backroom.getAddress(), buyPriceByBuyer);
 			await backroom.connect(buyer).buyShares(subject.address, buyAmountByBuyer, 1);
@@ -227,7 +226,7 @@ describe("Backroom", function () {
 			await testToken.connect(jhon).approve(await backroom.getAddress(), buyPriceByJhon);
 			await backroom.connect(jhon).buyShares(subject.address, buyAmountByJhon, 1);
 
-			const sellAmountByBuyer = 201n; // Trying to sell more than owned (buyer only has 200)
+			const sellAmountByBuyer = 3n; // Trying to sell more than owned (buyer only has 2)
 			// Don't calculate price as it will overflow, just approve a large amount
 			await testToken.connect(buyer).approve(await backroom.getAddress(), ethers.parseEther("1000"));
 

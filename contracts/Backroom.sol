@@ -146,7 +146,7 @@ contract Backroom is Ownable {
         address sharesSubject,
         uint256 amount,
         uint256 curveIndex
-    ) public payable {
+    ) public {
         uint256 supply = sharesSupply[sharesSubject];
         require(
             supply > 0 || sharesSubject == msg.sender,
@@ -202,7 +202,7 @@ contract Backroom is Ownable {
         ERC20(token).safeTransferFrom(msg.sender, sharesSubject, subjectFee);
     }
 
-    function sellShares(address sharesSubject, uint256 amount) public payable {
+    function sellShares(address sharesSubject, uint256 amount) public {
         uint256 supply = sharesSupply[sharesSubject];
         require(supply > amount, "Cannot sell the last share");
 

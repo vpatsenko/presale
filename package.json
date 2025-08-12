@@ -3,7 +3,10 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "npx hardhat test",
+    "slither": "PATH=\"$PATH:/Users/vpatsenko/Library/Python/3.9/bin\" slither . --compile-force-framework hardhat",
+    "slither:json": "PATH=\"$PATH:/Users/vpatsenko/Library/Python/3.9/bin\" slither . --compile-force-framework hardhat --json slither-report.json",
+    "slither:sarif": "PATH=\"$PATH:/Users/vpatsenko/Library/Python/3.9/bin\" slither . --compile-force-framework hardhat --sarif slither-report.sarif"
   },
   "keywords": [],
   "author": "",

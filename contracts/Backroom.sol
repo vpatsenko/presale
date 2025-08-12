@@ -14,9 +14,9 @@ contract Backroom is Ownable {
 
     address public token;
 
-    uint256 public divisor1;
-    uint256 public divisor2;
-    uint256 public divisor3;
+    uint256 public multiplier1;
+    uint256 public multiplier2;
+    uint256 public multiplier3;
 
     // SharesSubject => Curve Index (1, 2, or 3)
     mapping(address => uint256) public subjectCurve;
@@ -30,7 +30,7 @@ contract Backroom is Ownable {
         uint256 protocolEthAmount,
         uint256 subjectEthAmount,
         uint256 supply,
-        uint256 denominator
+        uint256 multiplier
     );
 
     // SharesSubject => (Holder => Balance)
@@ -44,21 +44,21 @@ contract Backroom is Ownable {
         uint256 _protocolFeePercent,
         uint256 _subjectFeePercent,
         address _token,
-        uint256 _divisor1,
-        uint256 _divisor2,
-        uint256 _divisor3
+        uint256 _multiplier1,
+        uint256 _multiplier2,
+        uint256 _multiplier3
     ) Ownable(msg.sender) {
-        require(_divisor1 > 0, "Divisor1 cannot be zero");
-        require(_divisor2 > 0, "Divisor2 cannot be zero");
-        require(_divisor3 > 0, "Divisor3 cannot be zero");
+        require(_multiplier1 > 0, "Multiplier1 cannot be zero");
+        require(_multiplier2 > 0, "Multiplier2 cannot be zero");
+        require(_multiplier3 > 0, "Multiplier3 cannot be zero");
 
         protocolFeeDestination = _feeDestination;
         protocolFeePercent = _protocolFeePercent;
         subjectFeePercent = _subjectFeePercent;
         token = _token;
-        divisor1 = _divisor1;
-        divisor2 = _divisor2;
-        divisor3 = _divisor3;
+        multiplier1 = _multiplier1;
+        multiplier2 = _multiplier2;
+        multiplier3 = _multiplier3;
     }
 
     function setFeeDestination(address _feeDestination) public onlyOwner {
@@ -88,19 +88,19 @@ contract Backroom is Ownable {
                 (2 * (supply - 1 + amount) + 1)) / 6;
         uint256 summation = sum2 - sum1;
 
-        uint256 divisor;
+        uint256 multiplier;
         uint256 curveIndex = subjectCurve[sharesSubject];
         if (curveIndex == 1) {
-            divisor = divisor1;
+            multiplier = multiplier1;
         } else if (curveIndex == 2) {
-            divisor = divisor2;
+            multiplier = multiplier2;
         } else if (curveIndex == 3) {
-            divisor = divisor3;
+            multiplier = multiplier3;
         } else {
-            divisor = divisor1; // Default to first curve
+            multiplier = multiplier1; // Default to first curve
         }
 
-        return (summation * 1 ether) / divisor;
+        return (summation * 1 ether) * multiplier;
     }
 
     function getBuyPrice(
@@ -168,17 +168,17 @@ contract Backroom is Ownable {
             amount;
         sharesSupply[sharesSubject] = supply + amount;
 
-        uint256 divisor;
+        uint256 multiplier;
         curveIndex = subjectCurve[sharesSubject];
 
         if (curveIndex == 1) {
-            divisor = divisor1;
+            multiplier = multiplier1;
         } else if (curveIndex == 2) {
-            divisor = divisor2;
+            multiplier = multiplier2;
         } else if (curveIndex == 3) {
-            divisor = divisor3;
+            multiplier = multiplier3;
         } else {
-            divisor = divisor1; // Default to first curve
+            multiplier = multiplier1; // Default to first curve
         }
 
         emit Trade(
@@ -190,7 +190,7 @@ contract Backroom is Ownable {
             protocolFee,
             subjectFee,
             supply + amount,
-            divisor
+            multiplier
         );
 
         ERC20(token).safeTransferFrom(msg.sender, address(this), price);
@@ -220,17 +220,17 @@ contract Backroom is Ownable {
             amount;
         sharesSupply[sharesSubject] = supply - amount;
 
-        uint256 divisor;
+        uint256 multiplier;
         uint256 curveIndex = subjectCurve[sharesSubject];
 
         if (curveIndex == 1) {
-            divisor = divisor1;
+            multiplier = multiplier1;
         } else if (curveIndex == 2) {
-            divisor = divisor2;
+            multiplier = multiplier2;
         } else if (curveIndex == 3) {
-            divisor = divisor3;
+            multiplier = multiplier3;
         } else {
-            divisor = divisor1; // Default to first curve
+            multiplier = multiplier1; // Default to first curve
         }
 
         emit Trade(
@@ -242,7 +242,7 @@ contract Backroom is Ownable {
             protocolFee,
             subjectFee,
             supply - amount,
-            divisor
+            multiplier
         );
 
         ERC20(token).safeTransfer(msg.sender, price - protocolFee - subjectFee);

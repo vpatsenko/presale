@@ -5,7 +5,7 @@ import path from "path";
 
 dotenv.config();
 
-const BACKROOM_SHARES_ADDRESS = process.env.BACKROOM_SHARES_ADDRESS || "";
+const BACKROOM_ADDRESS = process.env.BACKROOM_ADDRESS || "";
 
 // Helper function to wait/delay
 const delay = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
@@ -15,7 +15,7 @@ async function attemptVerification(constructorArgs: string[], attempt: number): 
 		console.log(`\n🔄 Verification attempt ${attempt}/4...`);
 
 		await run("verify:verify", {
-			address: BACKROOM_SHARES_ADDRESS,
+			address: BACKROOM_ADDRESS,
 			constructorArguments: constructorArgs,
 		});
 
@@ -34,12 +34,12 @@ async function attemptVerification(constructorArgs: string[], attempt: number): 
 }
 
 async function main(): Promise<void> {
-	console.log("Verifying BackroomShares contract...");
+	console.log("Verifying Backroom contract...");
 	console.log("=====================================");
 
-	if (!BACKROOM_SHARES_ADDRESS) {
-		console.error("❌ BACKROOM_SHARES_ADDRESS not found in environment variables");
-		console.log("Please set BACKROOM_SHARES_ADDRESS in your .env file");
+	if (!BACKROOM_ADDRESS) {
+		console.error("❌ BACKROOM_ADDRESS not found in environment variables");
+		console.log("Please set BACKROOM_ADDRESS in your .env file");
 		process.exit(1);
 	}
 
@@ -50,7 +50,7 @@ async function main(): Promise<void> {
 		"..",
 		"deployments",
 		network.chainId === 84532n ? "baseSepolia" : "base",
-		"BackroomShares.json"
+		"Backroom.json"
 	);
 
 	let deploymentData;
@@ -68,7 +68,7 @@ async function main(): Promise<void> {
 
 	const constructorArgs = deploymentData.args;
 
-	console.log("Contract address:", BACKROOM_SHARES_ADDRESS);
+	console.log("Contract address:", BACKROOM_ADDRESS);
 
 	console.log("\nConstructor arguments:");
 	console.log("- Protocol Fee Destination:", constructorArgs[0]);
@@ -91,11 +91,11 @@ async function main(): Promise<void> {
 			console.log(`\n🔗 View on explorer:`);
 
 			if (network.chainId === 8453n) { // Base Mainnet
-				console.log(`https://basescan.org/address/${BACKROOM_SHARES_ADDRESS}`);
+				console.log(`https://basescan.org/address/${BACKROOM_ADDRESS}`);
 			} else if (network.chainId === 84532n) { // Base Sepolia
-				console.log(`https://sepolia.basescan.org/address/${BACKROOM_SHARES_ADDRESS}`);
+				console.log(`https://sepolia.basescan.org/address/${BACKROOM_ADDRESS}`);
 			} else {
-				console.log(`Contract address: ${BACKROOM_SHARES_ADDRESS}`);
+				console.log(`Contract address: ${BACKROOM_ADDRESS}`);
 			}
 			return; // Exit successfully
 		}
@@ -113,9 +113,9 @@ async function main(): Promise<void> {
 	console.log(`1. Try again later when API is more stable`);
 	console.log(`2. Use manual verification on Basescan:`);
 	if (network.chainId === 84532n) {
-		console.log(`   https://sepolia.basescan.org/address/${BACKROOM_SHARES_ADDRESS}#code`);
+		console.log(`   https://sepolia.basescan.org/address/${BACKROOM_ADDRESS}#code`);
 	} else {
-		console.log(`   https://basescan.org/address/${BACKROOM_SHARES_ADDRESS}#code`);
+		console.log(`   https://basescan.org/address/${BACKROOM_ADDRESS}#code`);
 	}
 	console.log(`3. Check your ETHERSCAN_API_KEY is valid for Basescan`);
 

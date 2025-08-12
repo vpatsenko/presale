@@ -2,9 +2,6 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { Backroom, TestToken } from "../typechain-types";
-import { bigint } from "hardhat/internal/core/params/argumentTypes";
-import { Log } from "hardhat-deploy/types";
-import { TypedEventLog } from "../typechain-types/common";
 
 describe("Backroom", function () {
 	let backroom: Backroom;
@@ -105,9 +102,9 @@ describe("Backroom", function () {
 			const receipt = await tx.wait();
 			const tradeEvent = receipt!.logs.find((log: any) => log.fragment?.name === "Trade") as any;
 
-			const actualBasePrice = tradeEvent.args[4];  // ethAmount
-			const actualProtocolFee = tradeEvent.args[5]; // protocolEthAmount
-			const actualSubjectFee = tradeEvent.args[6];  // subjectEthAmount
+			const actualBasePrice = tradeEvent.args[4];  // tokenAmount
+			const actualProtocolFee = tradeEvent.args[5]; // protocolTokenAmount
+			const actualSubjectFee = tradeEvent.args[6];  // subjectTokenAmount
 
 			expect(price).to.equal(actualBasePrice + actualProtocolFee + actualSubjectFee);
 
@@ -142,9 +139,9 @@ describe("Backroom", function () {
 			const receipt = await tx.wait();
 			const tradeEvent = receipt!.logs.find((log: any) => log.fragment?.name === "Trade") as any;
 
-			const actualBasePrice = tradeEvent.args[4];  // ethAmount
-			const actualProtocolFee = tradeEvent.args[5]; // protocolEthAmount
-			const actualSubjectFee = tradeEvent.args[6];  // subjectEthAmount
+			const actualBasePrice = tradeEvent.args[4];  // tokenAmount
+			const actualProtocolFee = tradeEvent.args[5]; // protocolTokenAmount
+			const actualSubjectFee = tradeEvent.args[6];  // subjectTokenAmount
 
 			expect(price).to.equal(actualBasePrice + actualProtocolFee + actualSubjectFee);
 
@@ -188,9 +185,9 @@ describe("Backroom", function () {
 			const receipt = await tx.wait();
 			const tradeEvent = receipt!.logs.find((log: any) => log.fragment?.name === "Trade") as any;
 
-			const actualBasePrice = tradeEvent.args[4];  // ethAmount
-			const actualProtocolFee = tradeEvent.args[5]; // protocolEthAmount
-			const actualSubjectFee = tradeEvent.args[6];  // subjectEthAmount
+			const actualBasePrice = tradeEvent.args[4];  // tokenAmount
+			const actualProtocolFee = tradeEvent.args[5]; // protocolTokenAmount
+			const actualSubjectFee = tradeEvent.args[6];  // subjectTokenAmount
 
 			expect(sellPriceByBuyer).to.equal(actualBasePrice - actualProtocolFee - actualSubjectFee);
 

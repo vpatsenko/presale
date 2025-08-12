@@ -26,9 +26,9 @@ contract Backroom is Ownable {
         address subject,
         bool isBuy,
         uint256 shareAmount,
-        uint256 ethAmount,
-        uint256 protocolEthAmount,
-        uint256 subjectEthAmount,
+        uint256 tokenAmount,
+        uint256 protocolTokenAmount,
+        uint256 subjectTokenAmount,
         uint256 supply,
         uint256 multiplier
     );

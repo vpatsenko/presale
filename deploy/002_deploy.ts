@@ -32,14 +32,14 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 	if (!process.env.ERC20_ADDRESS) {
 		throw new Error("ERC20_ADDRESS environment variable is required");
 	}
-	if (!process.env.DIVISOR1) {
-		throw new Error("DIVISOR1 environment variable is required");
+	if (!process.env.MULTIPLIER1) {
+		throw new Error("MULTIPLIER1 environment variable is required");
 	}
-	if (!process.env.DIVISOR2) {
-		throw new Error("DIVISOR2 environment variable is required");
+	if (!process.env.MULTIPLIER2) {
+		throw new Error("MULTIPLIER2 environment variable is required");
 	}
-	if (!process.env.DIVISOR3) {
-		throw new Error("DIVISOR3 environment variable is required");
+	if (!process.env.MULTIPLIER3) {
+		throw new Error("MULTIPLIER3 environment variable is required");
 	}
 
 	// Get parameters from environment variables
@@ -47,30 +47,30 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 	const protocolFeePercent = process.env.PROTOCOL_FEE_PERCENT;
 	const subjectFeePercent = process.env.SUBJECT_FEE_PERCENT;
 	const tokenAddress = process.env.ERC20_ADDRESS;
-	const divisor1 = process.env.DIVISOR1;
-	const divisor2 = process.env.DIVISOR2;
-	const divisor3 = process.env.DIVISOR3;
+	const multiplier1 = process.env.MULTIPLIER1;
+	const multiplier2 = process.env.MULTIPLIER2;
+	const multiplier3 = process.env.MULTIPLIER3;
 
 	console.log("Deployment parameters:");
 	console.log("- Protocol Fee Destination:", protocolFeeDestination);
 	console.log("- Protocol Fee Percent:", protocolFeePercent);
 	console.log("- Subject Fee Percent:", subjectFeePercent);
 	console.log("- Token Address:", tokenAddress);
-	console.log("- Divisor 1:", divisor1);
-	console.log("- Divisor 2:", divisor2);
-	console.log("- Divisor 3:", divisor3);
+	console.log("- Multiplier 1:", multiplier1);
+	console.log("- Multiplier 2:", multiplier2);
+	console.log("- Multiplier 3:", multiplier3);
 
 	// Deploy the contract using hardhat-deploy
-	const deployment = await deploy("BackroomShares", {
+	const deployment = await deploy("Backroom", {
 		from: deployer,
 		args: [
 			protocolFeeDestination,
 			protocolFeePercent,
 			subjectFeePercent,
 			tokenAddress,
-			divisor1,
-			divisor2,
-			divisor3
+			multiplier1,
+			multiplier2,
+			multiplier3
 		],
 		log: true,
 		waitConfirmations: 1,
@@ -81,4 +81,4 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 };
 
 export default func;
-func.tags = ["BackroomShares"];
+func.tags = ["Backroom"];

@@ -77,7 +77,7 @@ async function main(): Promise<void> {
     console.log("Starting Token Distribution process...\n");
 
     try {
-        console.log("📄 Loading presale allocations...");
+        console.log("Loading presale allocations...");
         const presaleAllocPath = path.join(__dirname, '..', 'distribution.csv');
         const csvContent = fs.readFileSync(presaleAllocPath, 'utf-8');
         const allocations = CSVParser.parsePresaleAllocations(csvContent);

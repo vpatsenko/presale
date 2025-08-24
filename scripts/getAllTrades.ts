@@ -80,7 +80,7 @@ async function delay(ms: number): Promise<void> {
 
 // Optimized block processing
 async function processBlockRange(
-	provider: any,
+	provider: ethers.providers.JsonRpcProvider,
 	poolAddress: string,
 	fromBlock: number,
 	toBlock: number,
@@ -145,8 +145,14 @@ async function processBlockRange(
 					const amount0In = decoded[0];
 					const amount1Out = decoded[3];
 
+
 					// Extract recipient from topics
-					const to = "0x" + log.topics[2].slice(26);
+					// const to = "0x" + log.topics[2].slice(26);
+					const to = (await provider.getTransaction(log.transactionHash)).to;
+
+					// console.log(to);
+
+
 
 					// Check for purchases (receiving token1)
 					if (amount1Out > 0 && amount0In > 0) {
@@ -184,7 +190,7 @@ async function processBlockRange(
 }
 
 // Main processing function
-async function getAllTradesOptimized(config: Config = CONFIG): Promise<void> {
+async function getAllTradesOptimized(config: Config = CONFIG, endBlock?: number): Promise<void> {
 	console.log("Starting optimized token purchase collection...");
 	console.log(`Date range: ${config.startDate.toISOString()} to ${config.endDate.toISOString()}`);
 	console.log(`Pool address: ${config.poolAddress}`);
@@ -211,7 +217,8 @@ async function getAllTradesOptimized(config: Config = CONFIG): Promise<void> {
 		console.log(`Pool token0: ${token0Address}`);
 		console.log(`Pool token1: ${token1Address}`);
 		console.log(`Current block: ${latestBlock}`);
-		console.log(`Starting from pool creation block: ${config.poolCreationBlock}`);
+		console.log(`Starting from block: ${config.poolCreationBlock}`);
+		console.log(`Ending at block: ${endBlock || latestBlock}`);
 	} catch (error) {
 		throw new Error(`Failed to get pool information: ${error}`);
 	}
@@ -219,13 +226,14 @@ async function getAllTradesOptimized(config: Config = CONFIG): Promise<void> {
 	const purchases: Purchase[] = [];
 	let currentBlock = config.poolCreationBlock;
 	let processedChunks = 0;
-	let totalChunks = Math.ceil((latestBlock - config.poolCreationBlock) / config.chunkSize);
+	const targetEndBlock = endBlock || latestBlock;
+	let totalChunks = Math.ceil((targetEndBlock - config.poolCreationBlock) / config.chunkSize);
 	let lastProgressTime = Date.now();
 
 	console.log(`Estimated total chunks to process: ${totalChunks}`);
 
-	while (currentBlock <= latestBlock) {
-		const toBlock = Math.min(currentBlock + config.chunkSize - 1, latestBlock);
+	while (currentBlock <= targetEndBlock) {
+		const toBlock = Math.min(currentBlock + config.chunkSize - 1, targetEndBlock);
 		processedChunks++;
 
 		// Progress update every 10 seconds
@@ -312,10 +320,68 @@ async function savePurchasesToCSV(purchases: Map<string, AggregatedPurchase>): P
 	fs.writeFileSync("purchases.csv", csvContent);
 }
 
+// Block finding utility
+async function findBlockForDate(provider: any, targetDate: Date): Promise<number> {
+	const targetTimestamp = Math.floor(targetDate.getTime() / 1000);
+
+	// Get the latest block to establish upper bound
+	const latestBlock = await provider.getBlockNumber();
+	const latestBlockData = await provider.getBlock(latestBlock);
+	const latestTimestamp = latestBlockData.timestamp;
+
+	if (targetTimestamp > latestTimestamp) {
+		throw new Error(`Target date ${targetDate.toISOString()} is in the future. Latest block timestamp: ${new Date(latestTimestamp * 1000).toISOString()}`);
+	}
+
+	// Binary search to find the closest block
+	let left = 0;
+	let right = latestBlock;
+	let closestBlock = 0;
+	let closestDiff = Infinity;
+
+	while (left <= right) {
+		const mid = Math.floor((left + right) / 2);
+		const blockData = await provider.getBlock(mid);
+		const blockTimestamp = blockData.timestamp;
+
+		const diff = Math.abs(blockTimestamp - targetTimestamp);
+		if (diff < closestDiff) {
+			closestDiff = diff;
+			closestBlock = mid;
+		}
+
+		if (blockTimestamp === targetTimestamp) {
+			return mid;
+		} else if (blockTimestamp < targetTimestamp) {
+			left = mid + 1;
+		} else {
+			right = mid - 1;
+		}
+	}
+
+	return closestBlock;
+}
+
 // Main execution
 async function main() {
 	try {
-		await getAllTradesOptimized();
+		console.log("Finding blocks for start and end dates...");
+
+		const startBlock = await findBlockForDate(ethers.provider, CONFIG.startDate);
+		const endBlock = await findBlockForDate(ethers.provider, CONFIG.endDate);
+
+		console.log(`Start date ${CONFIG.startDate.toISOString()} -> Block ${startBlock}`);
+		console.log(`End date ${CONFIG.endDate.toISOString()} -> Block ${endBlock}`);
+
+		// Update config with found blocks
+		const updatedConfig = {
+			...CONFIG,
+			poolCreationBlock: startBlock
+		};
+
+		console.log("Starting trade analysis...");
+		await getAllTradesOptimized(updatedConfig, endBlock);
+
 	} catch (error) {
 		console.error("Fatal error:", error);
 		process.exit(1);

@@ -25,10 +25,6 @@ const ERC20_ABI = [
     "function transfer(address to, uint256 amount) returns (bool)"
 ];
 
-const MULTICALL_ABI = [
-    "function tryAggregate(bool requireSuccess, tuple(address target, bytes callData)[] calls) returns (tuple(bool success, bytes returnData)[] returnData)"
-];
-
 class CSVParser {
     static parsePresaleAllocations(csvContent: string): PresaleAllocation[] {
         const lines = csvContent.trim().split('\n');
@@ -51,24 +47,29 @@ class CSVParser {
     }
 }
 
-async function distributeTokensBatch(allocations: PresaleAllocation[]): Promise<void> {
+async function distributeTokens(allocations: PresaleAllocation[]): Promise<void> {
     const [signer] = await ethers.getSigners();
     const tokenContract = new ethers.Contract(CONFIG.roomTokenAddress, ERC20_ABI, signer);
-    const multicallContract = new ethers.Contract("0xcA11bde05977b3631167028862bE2a173976CA11", MULTICALL_ABI, signer);
 
-    for (let i = 0; i < allocations.length; i += 100) {
-        const batch = allocations.slice(i, i + 100);
+    console.log(`Starting distribution of ${allocations.length} allocations...`);
 
-        const calls = batch.map(allocation => ({
-            target: tokenContract.target,
-            callData: tokenContract.interface.encodeFunctionData("transfer", [
+    for (let i = 0; i < allocations.length; i++) {
+        const allocation = allocations[i];
+
+        try {
+            console.log(`[${i + 1}/${allocations.length}] Transferring ${allocation.amount} tokens to ${allocation.address}...`);
+
+            const tx = await tokenContract.transfer(
                 allocation.address,
-                ethers.parseUnits(allocation.amount, 18)
-            ])
-        }));
+                allocation.amount
+            );
 
-        const tx = await multicallContract.tryAggregate(false, calls);
-        await tx.wait();
+            await tx.wait();
+            console.log(`   ✅ Transfer completed! TX: ${tx.hash}`);
+
+        } catch (error: any) {
+            console.error(`   ❌ Transfer failed: ${error.message}`);
+        }
     }
 }
 
@@ -77,12 +78,12 @@ async function main(): Promise<void> {
     console.log("Starting Token Distribution process...\n");
 
     try {
-        console.log("Loading presale allocations...");
+        console.log("📄 Loading presale allocations...");
         const presaleAllocPath = path.join(__dirname, '..', 'distribution.csv');
         const csvContent = fs.readFileSync(presaleAllocPath, 'utf-8');
         const allocations = CSVParser.parsePresaleAllocations(csvContent);
 
-        await distributeTokensBatch(allocations);
+        await distributeTokens(allocations);
 
         console.log("\nProcess completed successfully!");
     } catch (error: any) {

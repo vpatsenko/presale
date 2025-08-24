@@ -4,214 +4,327 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+// Types and Interfaces
 interface Purchase {
-    address: string;
-    amount: string;
-    timestamp: number;
-    blockNumber: number;
-    txHash: string;
+	address: string;
+	amount: string;
+	timestamp: number;
+	blockNumber: number;
+	txHash: string;
 }
+
+interface AggregatedPurchase {
+	totalAmount: bigint;
+	transactions: number;
+	firstPurchase: number;
+}
+
+interface Config {
+	poolAddress: string;
+	startDate: Date;
+	endDate: Date;
+	poolCreationBlock: number;
+	chunkSize: number;
+	delayMs: number;
+	maxBlocksPerRequest: number;
+}
+
+// Configuration - Optimized for better performance
+const CONFIG: Config = {
+	poolAddress: "0xB4c4e80abE1C807B8f30ac72c9420dD6acEcE8d5",
+	startDate: new Date("2025-06-18T00:00:00Z"),
+	endDate: new Date("2025-07-30T23:59:59Z"),
+	poolCreationBlock: 31733046,
+	chunkSize: 5_000, // Much smaller chunks for faster processing
+	delayMs: 100, // Slightly longer delay to avoid rate limiting
+	maxBlocksPerRequest: 5_000 // Limit RPC request size
+};
 
 // Uniswap V2 Pool ABI for Swap events
 const UNISWAP_V2_POOL_ABI = [
-    "event Swap(address indexed sender, uint amount0In, uint amount1In, uint amount0Out, uint amount1Out, address indexed to)",
-    "function token0() external view returns (address)",
-    "function token1() external view returns (address)"
+	"event Swap(address indexed sender, uint amount0In, uint amount1In, uint amount0Out, uint amount1Out, address indexed to)",
+	"function token0() external view returns (address)",
+	"function token1() external view returns (address)"
 ];
 
-const POOL_ADDRESS = "0xB4c4e80abE1C807B8f30ac72c9420dD6acEcE8d5";
+// Utility functions
+function validateConfig(config: Config): void {
+	try {
+		ethers.getAddress(config.poolAddress);
+	} catch {
+		throw new Error(`Invalid pool address: ${config.poolAddress}`);
+	}
 
-const START_DATE = new Date("2025-06-30T00:00:00Z");
-const END_DATE = new Date("2025-07-18T23:59:59Z");
+	if (config.startDate >= config.endDate) {
+		throw new Error("Start date must be before end date");
+	}
 
-async function getAllTrades(): Promise<void> {
-    console.log("Starting to collect token purchases...");
+	if (config.poolCreationBlock < 0) {
+		throw new Error("Pool creation block must be positive");
+	}
 
-    const provider = ethers.provider;
-    const poolContract = new ethers.Contract(POOL_ADDRESS, UNISWAP_V2_POOL_ABI, provider);
-
-    const token0Address = await poolContract.token0();
-    const token1Address = await poolContract.token1();
-    console.log(`Pool token0: ${token0Address}`);
-    console.log(`Pool token1: ${token1Address}`);
-
-    const latestBlock = await provider.getBlockNumber();
-    console.log(`Current block: ${latestBlock}`);
-
-    console.log(`Date range: ${START_DATE.toISOString()} to ${END_DATE.toISOString()}`);
-
-    const purchases: Purchase[] = [];
-    const chunkSize = 10000;
-    const POOL_CREATION_BLOCK = 31733046;
-
-    let collectingSwaps = false;
-    let currentBlock = POOL_CREATION_BLOCK;
-
-    console.log(`Starting from pool creation block: ${POOL_CREATION_BLOCK}`);
-
-    while (currentBlock <= latestBlock) {
-        const toBlock = Math.min(currentBlock + chunkSize - 1, latestBlock);
-        console.log(`Processing blocks ${currentBlock} to ${toBlock}...`);
-
-        try {
-            const firstBlock = await provider.getBlock(currentBlock);
-            const lastBlock = await provider.getBlock(toBlock);
-
-            if (!firstBlock || !lastBlock) {
-                currentBlock = toBlock + 1;
-                continue;
-            }
-
-            const firstTimestamp = firstBlock.timestamp;
-            const lastTimestamp = lastBlock.timestamp;
-
-            if (!collectingSwaps && lastTimestamp >= START_DATE.getTime() / 1000) {
-                collectingSwaps = true;
-                console.log(`🎯 Started collecting swaps from ${new Date(firstTimestamp * 1000).toISOString()}`);
-            }
-
-            if (collectingSwaps && firstTimestamp > END_DATE.getTime() / 1000) {
-                console.log(`🛑 Past target date range, stopping at ${new Date(firstTimestamp * 1000).toISOString()}`);
-                break;
-            }
-
-            const chunkOverlapsTarget = (
-                firstTimestamp <= END_DATE.getTime() / 1000 && lastTimestamp >= START_DATE.getTime() / 1000
-            );
-
-            if (!chunkOverlapsTarget) {
-                currentBlock = toBlock + 1;
-                continue;
-            }
-
-            const swapEventHash = ethers.id("Swap(address,uint256,uint256,uint256,uint256,address)");
-            const logs = await provider.getLogs({
-                address: POOL_ADDRESS,
-                fromBlock: currentBlock,
-                toBlock: toBlock,
-                topics: [swapEventHash]
-            });
-
-            let purchasesInChunk = 0;
-
-            for (const log of logs) {
-                const block = await provider.getBlock(log.blockNumber);
-                const timestamp = block!.timestamp;
-
-                // Only process events within our target date range
-                if (timestamp >= START_DATE.getTime() / 1000 && timestamp <= END_DATE.getTime() / 1000) {
-                    try {
-                        // Decode the log data
-                        const decoded = ethers.AbiCoder.defaultAbiCoder().decode(
-                            ["uint256", "uint256", "uint256", "uint256"],
-                            log.data
-                        );
-
-                        const amount0In = decoded[0];
-                        const amount1Out = decoded[3];
-
-                        // Extract recipient from topics (remove padding)
-                        const to = "0x" + log.topics[2].slice(26);
-
-                        // Token1 is our target token - check for purchases (receiving token1)
-                        if (amount1Out > 0 && amount0In > 0) {
-                            purchasesInChunk++;
-
-                            purchases.push({
-                                address: to,
-                                amount: ethers.formatUnits(amount1Out, 18),
-                                timestamp: timestamp,
-                                blockNumber: log.blockNumber,
-                                txHash: log.transactionHash
-                            });
-                        }
-
-                    } catch (decodeError) {
-                        console.log(`❌ Error decoding log at block ${log.blockNumber}: ${decodeError}`);
-                    }
-                }
-            }
-
-            if (purchasesInChunk > 0) {
-                console.log(`✅ Found ${purchasesInChunk} purchases in blocks ${currentBlock}-${toBlock} (${purchases.length} total)`);
-            }
-
-        } catch (error) {
-            console.error(`❌ Error processing blocks ${currentBlock}-${toBlock}:`, error);
-        }
-
-        currentBlock = toBlock + 1;
-
-        await new Promise(resolve => setTimeout(resolve, 50));
-    }
-
-    console.log(`Found ${purchases.length} token purchases`);
-
-    const aggregatedPurchases = aggregatePurchasesByAddress(purchases);
-
-    await savePurchasesToCSV(aggregatedPurchases);
-
-    console.log(`Results saved to purchases.csv`);
-    console.log(`Total unique buyers: ${aggregatedPurchases.size}`);
+	if (config.chunkSize <= 0 || config.chunkSize > 5_001) {
+		throw new Error("Chunk size must be between 1 and 5000");
+	}
 }
 
-
-
-function aggregatePurchasesByAddress(purchases: Purchase[]): Map<string, { totalAmount: bigint, transactions: number, firstPurchase: number }> {
-    const aggregated = new Map<string, { totalAmount: bigint, transactions: number, firstPurchase: number }>();
-
-    for (const purchase of purchases) {
-        const address = purchase.address.toLowerCase();
-        const amount = ethers.parseUnits(purchase.amount, 18);
-
-        if (aggregated.has(address)) {
-            const existing = aggregated.get(address)!;
-            existing.totalAmount += amount;
-            existing.transactions += 1;
-            existing.firstPurchase = Math.min(existing.firstPurchase, purchase.timestamp);
-        } else {
-            aggregated.set(address, {
-                totalAmount: amount,
-                transactions: 1,
-                firstPurchase: purchase.timestamp
-            });
-        }
-    }
-
-    return aggregated;
+function isWithinDateRange(timestamp: number, startDate: Date, endDate: Date): boolean {
+	const startTimestamp = Math.floor(startDate.getTime() / 1000);
+	const endTimestamp = Math.floor(endDate.getTime() / 1000);
+	return timestamp >= startTimestamp && timestamp <= endTimestamp;
 }
 
-async function savePurchasesToCSV(purchases: Map<string, { totalAmount: bigint, transactions: number, firstPurchase: number }>): Promise<void> {
-    let csvContent = "address,total_amount,transaction_count,first_purchase_timestamp\n";
+async function delay(ms: number): Promise<void> {
+	return new Promise(resolve => setTimeout(resolve, ms));
+}
 
-    // Sort by total amount descending
-    const sortedEntries = Array.from(purchases.entries()).sort((a, b) => {
-        if (a[1].totalAmount > b[1].totalAmount) return -1;
-        if (a[1].totalAmount < b[1].totalAmount) return 1;
-        return 0;
-    });
+// Optimized block processing
+async function processBlockRange(
+	provider: any,
+	poolAddress: string,
+	fromBlock: number,
+	toBlock: number,
+	startDate: Date,
+	endDate: Date
+): Promise<Purchase[]> {
+	const purchases: Purchase[] = [];
+	const swapEventHash = ethers.id("Swap(address,uint256,uint256,uint256,uint256,address)");
 
-    for (const [address, data] of sortedEntries) {
-        const amountFormatted = ethers.formatUnits(data.totalAmount, 18);
-        csvContent += `${address},${amountFormatted},${data.transactions},${data.firstPurchase}\n`;
-    }
+	try {
+		// Get logs for this block range
+		const logs = await provider.getLogs({
+			address: poolAddress,
+			fromBlock: fromBlock,
+			toBlock: toBlock,
+			topics: [swapEventHash]
+		});
 
-    fs.writeFileSync("purchases.csv", csvContent);
+		if (logs.length === 0) {
+			return [];
+		}
+
+		console.log(`Found ${logs.length} swap events in blocks ${fromBlock}-${toBlock}`);
+
+		// Process logs in small batches
+		const batchSize = 50;
+		let processedCount = 0;
+
+		for (let i = 0; i < logs.length; i += batchSize) {
+			const batch = logs.slice(i, i + batchSize);
+
+			// Get block timestamps for this batch
+			const blockNumbers = [...new Set(batch.map(log => log.blockNumber))];
+			const blockPromises = blockNumbers.map(blockNum => provider.getBlock(blockNum));
+			const blocks = await Promise.all(blockPromises);
+
+			// Create a map of block number to timestamp
+			const blockTimestamps = new Map();
+			blocks.forEach(block => {
+				if (block) {
+					blockTimestamps.set(block.number, block.timestamp);
+				}
+			});
+
+			// Process each log in the batch
+			for (const log of batch) {
+				try {
+					const timestamp = blockTimestamps.get(log.blockNumber);
+					if (!timestamp) continue;
+
+					// Check if within date range
+					if (!isWithinDateRange(timestamp, startDate, endDate)) {
+						continue;
+					}
+
+					// Decode the log data
+					const decoded = ethers.AbiCoder.defaultAbiCoder().decode(
+						["uint256", "uint256", "uint256", "uint256"],
+						log.data
+					);
+
+					const amount0In = decoded[0];
+					const amount1Out = decoded[3];
+
+					// Extract recipient from topics
+					const to = "0x" + log.topics[2].slice(26);
+
+					// Check for purchases (receiving token1)
+					if (amount1Out > 0 && amount0In > 0) {
+						purchases.push({
+							address: to,
+							amount: ethers.formatUnits(amount1Out, 18),
+							timestamp: timestamp,
+							blockNumber: log.blockNumber,
+							txHash: log.transactionHash
+						});
+					}
+
+				} catch (decodeError) {
+					// Skip malformed logs
+					continue;
+				}
+			}
+
+			processedCount += batch.length;
+			if (processedCount % 200 === 0) {
+				console.log(`Processed ${processedCount}/${logs.length} events...`);
+			}
+
+			// Small delay between batches
+			if (i + batchSize < logs.length) {
+				await delay(20);
+			}
+		}
+
+	} catch (error) {
+		console.error(`Error processing blocks ${fromBlock}-${toBlock}:`, error);
+	}
+
+	return purchases;
+}
+
+// Main processing function
+async function getAllTradesOptimized(config: Config = CONFIG): Promise<void> {
+	console.log("Starting optimized token purchase collection...");
+	console.log(`Date range: ${config.startDate.toISOString()} to ${config.endDate.toISOString()}`);
+	console.log(`Pool address: ${config.poolAddress}`);
+	console.log(`Chunk size: ${config.chunkSize}`);
+	console.log(`Max blocks per request: ${config.maxBlocksPerRequest}`);
+
+	// Validate configuration
+	validateConfig(config);
+
+	const provider = ethers.provider;
+	const poolContract = new ethers.Contract(config.poolAddress, UNISWAP_V2_POOL_ABI, provider);
+
+	// Get pool information
+	let latestBlock: number;
+	try {
+		const [token0Address, token1Address, currentBlockNumber] = await Promise.all([
+			poolContract.token0(),
+			poolContract.token1(),
+			provider.getBlockNumber()
+		]);
+
+		latestBlock = currentBlockNumber;
+
+		console.log(`Pool token0: ${token0Address}`);
+		console.log(`Pool token1: ${token1Address}`);
+		console.log(`Current block: ${latestBlock}`);
+		console.log(`Starting from pool creation block: ${config.poolCreationBlock}`);
+	} catch (error) {
+		throw new Error(`Failed to get pool information: ${error}`);
+	}
+
+	const purchases: Purchase[] = [];
+	let currentBlock = config.poolCreationBlock;
+	let processedChunks = 0;
+	let totalChunks = Math.ceil((latestBlock - config.poolCreationBlock) / config.chunkSize);
+	let lastProgressTime = Date.now();
+
+	console.log(`Estimated total chunks to process: ${totalChunks}`);
+
+	while (currentBlock <= latestBlock) {
+		const toBlock = Math.min(currentBlock + config.chunkSize - 1, latestBlock);
+		processedChunks++;
+
+		// Progress update every 10 seconds
+		const now = Date.now();
+		if (now - lastProgressTime > 10000) {
+			console.log(`Progress: ${processedChunks}/${totalChunks} chunks (${Math.round(processedChunks / totalChunks * 100)}%)`);
+			lastProgressTime = now;
+		}
+
+		try {
+			const chunkPurchases = await processBlockRange(
+				provider,
+				config.poolAddress,
+				currentBlock,
+				toBlock,
+				config.startDate,
+				config.endDate
+			);
+
+			purchases.push(...chunkPurchases);
+
+			if (chunkPurchases.length > 0) {
+				console.log(`Found ${chunkPurchases.length} purchases in chunk ${processedChunks} (${purchases.length} total)`);
+			}
+
+		} catch (error) {
+			console.error(`Error processing chunk ${processedChunks}:`, error);
+		}
+
+		currentBlock = toBlock + 1;
+		await delay(config.delayMs);
+	}
+
+	console.log(`Found ${purchases.length} total token purchases`);
+	console.log(`Processing ${purchases.length} purchases...`);
+
+	const aggregatedPurchases = aggregatePurchasesByAddress(purchases);
+	await savePurchasesToCSV(aggregatedPurchases);
+
+	console.log(`Results saved to purchases.csv`);
+	console.log(`Total unique buyers: ${aggregatedPurchases.size}`);
+}
+
+// Data processing functions
+function aggregatePurchasesByAddress(purchases: Purchase[]): Map<string, AggregatedPurchase> {
+	const aggregated = new Map<string, AggregatedPurchase>();
+
+	for (const purchase of purchases) {
+		const address = purchase.address.toLowerCase();
+		const amount = ethers.parseUnits(purchase.amount, 18);
+
+		if (aggregated.has(address)) {
+			const existing = aggregated.get(address)!;
+			existing.totalAmount += amount;
+			existing.transactions += 1;
+			existing.firstPurchase = Math.min(existing.firstPurchase, purchase.timestamp);
+		} else {
+			aggregated.set(address, {
+				totalAmount: amount,
+				transactions: 1,
+				firstPurchase: purchase.timestamp
+			});
+		}
+	}
+
+	return aggregated;
+}
+
+async function savePurchasesToCSV(purchases: Map<string, AggregatedPurchase>): Promise<void> {
+	let csvContent = "address,total_amount,transaction_count,first_purchase_timestamp\n";
+
+	// Sort by total amount descending
+	const sortedEntries = Array.from(purchases.entries()).sort((a, b) => {
+		if (a[1].totalAmount > b[1].totalAmount) return -1;
+		if (a[1].totalAmount < b[1].totalAmount) return 1;
+		return 0;
+	});
+
+	for (const [address, data] of sortedEntries) {
+		const amountFormatted = ethers.formatUnits(data.totalAmount, 18);
+		csvContent += `${address},${amountFormatted},${data.transactions},${data.firstPurchase}\n`;
+	}
+
+	fs.writeFileSync("purchases.csv", csvContent);
 }
 
 // Main execution
 async function main() {
-    try {
-        await getAllTrades();
-    } catch (error) {
-        console.error("Error:", error);
-        process.exit(1);
-    }
+	try {
+		await getAllTradesOptimized();
+	} catch (error) {
+		console.error("Fatal error:", error);
+		process.exit(1);
+	}
 }
 
 if (require.main === module) {
-    main().catch((error) => {
-        console.error(error);
-        process.exit(1);
-    });
+	main().catch((error) => {
+		console.error("Unhandled error:", error);
+		process.exit(1);
+	});
 }

@@ -148,7 +148,7 @@ async function processBlockRange(
 
 					// Extract recipient from topics
 					// const to = "0x" + log.topics[2].slice(26);
-					const to = (await provider.getTransaction(log.transactionHash)).to;
+					const to = (await provider.getTransaction(log.transactionHash)).from;
 
 					// console.log(to);
 

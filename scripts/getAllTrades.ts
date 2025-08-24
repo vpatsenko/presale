@@ -43,10 +43,10 @@ async function getAllTrades(): Promise<void> {
     const purchases: Purchase[] = [];
     const chunkSize = 10000;
     const POOL_CREATION_BLOCK = 31733046;
-    
+
     let collectingSwaps = false;
     let currentBlock = POOL_CREATION_BLOCK;
-    
+
     console.log(`Starting from pool creation block: ${POOL_CREATION_BLOCK}`);
 
     while (currentBlock <= latestBlock) {
@@ -54,49 +54,36 @@ async function getAllTrades(): Promise<void> {
         console.log(`Processing blocks ${currentBlock} to ${toBlock}...`);
 
         try {
-            // First, check the timestamp range of this chunk
             const firstBlock = await provider.getBlock(currentBlock);
             const lastBlock = await provider.getBlock(toBlock);
-            
+
             if (!firstBlock || !lastBlock) {
-                console.log(`❌ Could not get block data, skipping chunk`);
                 currentBlock = toBlock + 1;
                 continue;
             }
 
             const firstTimestamp = firstBlock.timestamp;
             const lastTimestamp = lastBlock.timestamp;
-            const firstDate = new Date(firstTimestamp * 1000);
-            const lastDate = new Date(lastTimestamp * 1000);
 
-            console.log(`  Block range dates: ${firstDate.toISOString()} to ${lastDate.toISOString()}`);
-
-            // Check if we should start collecting in this chunk
             if (!collectingSwaps && lastTimestamp >= START_DATE.getTime() / 1000) {
                 collectingSwaps = true;
-                console.log(`🎯 Target date range starts in this chunk`);
+                console.log(`🎯 Started collecting swaps from ${new Date(firstTimestamp * 1000).toISOString()}`);
             }
 
-            // Check if we should stop collecting after this chunk  
             if (collectingSwaps && firstTimestamp > END_DATE.getTime() / 1000) {
-                console.log(`🛑 Past target date range, stopping`);
+                console.log(`🛑 Past target date range, stopping at ${new Date(firstTimestamp * 1000).toISOString()}`);
                 break;
             }
 
-            // Only get swap events if we're collecting or this chunk might contain the start/end dates
-            const chunkMightHaveTargetDates = (
-                (firstTimestamp <= END_DATE.getTime() / 1000 && lastTimestamp >= START_DATE.getTime() / 1000)
+            const chunkOverlapsTarget = (
+                firstTimestamp <= END_DATE.getTime() / 1000 && lastTimestamp >= START_DATE.getTime() / 1000
             );
 
-            if (!chunkMightHaveTargetDates) {
-                console.log(`  ⏭️ Chunk outside target date range, skipping`);
+            if (!chunkOverlapsTarget) {
                 currentBlock = toBlock + 1;
                 continue;
             }
 
-            console.log(`  🔍 Checking for swap events...`);
-
-            // Use raw log filtering instead of contract filtering
             const swapEventHash = ethers.id("Swap(address,uint256,uint256,uint256,uint256,address)");
             const logs = await provider.getLogs({
                 address: POOL_ADDRESS,
@@ -104,8 +91,6 @@ async function getAllTrades(): Promise<void> {
                 toBlock: toBlock,
                 topics: [swapEventHash]
             });
-
-            console.log(`  Found ${logs.length} swap events`);
 
             let purchasesInChunk = 0;
 
@@ -121,39 +106,34 @@ async function getAllTrades(): Promise<void> {
                             ["uint256", "uint256", "uint256", "uint256"],
                             log.data
                         );
-                        
+
                         const amount0In = decoded[0];
-                        const amount1In = decoded[1];
-                        const amount0Out = decoded[2];
                         const amount1Out = decoded[3];
-                        
-                        // Extract sender and to from topics (they have 0x padding)
-                        const to = "0x" + log.topics[2].slice(26); // Remove padding
-                        
-                        // Token1 (0x6555255b8dEd3c538Cb398d9E36769f45D7d3ea7) is our target token
-                        // If amount1Out > 0 and amount0In > 0, someone is buying token1 with token0
+
+                        // Extract recipient from topics (remove padding)
+                        const to = "0x" + log.topics[2].slice(26);
+
+                        // Token1 is our target token - check for purchases (receiving token1)
                         if (amount1Out > 0 && amount0In > 0) {
-                            // User is buying token1 (our target token)
-                            const purchaseAmount = amount1Out;
                             purchasesInChunk++;
-                            
+
                             purchases.push({
                                 address: to,
-                                amount: ethers.formatUnits(purchaseAmount, 18),
+                                amount: ethers.formatUnits(amount1Out, 18),
                                 timestamp: timestamp,
                                 blockNumber: log.blockNumber,
                                 txHash: log.transactionHash
                             });
                         }
-                        
+
                     } catch (decodeError) {
-                        console.log(`  ❌ Error decoding log at block ${log.blockNumber}: ${decodeError}`);
+                        console.log(`❌ Error decoding log at block ${log.blockNumber}: ${decodeError}`);
                     }
                 }
             }
 
             if (purchasesInChunk > 0) {
-                console.log(`  ✅ Found ${purchasesInChunk} token purchases in this chunk`);
+                console.log(`✅ Found ${purchasesInChunk} purchases in blocks ${currentBlock}-${toBlock} (${purchases.length} total)`);
             }
 
         } catch (error) {
@@ -161,17 +141,14 @@ async function getAllTrades(): Promise<void> {
         }
 
         currentBlock = toBlock + 1;
-        
-        // Small delay to avoid overwhelming the RPC
+
         await new Promise(resolve => setTimeout(resolve, 50));
     }
 
     console.log(`Found ${purchases.length} token purchases`);
 
-    // Aggregate purchases by address
     const aggregatedPurchases = aggregatePurchasesByAddress(purchases);
 
-    // Save to CSV
     await savePurchasesToCSV(aggregatedPurchases);
 
     console.log(`Results saved to purchases.csv`);

@@ -3,12 +3,15 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title BackroomPresale
- * @dev Presale contract for Backroom token with ETH contributions
+ * @dev Presale contract for Backroom token with USDC contributions
  */
 contract BackroomPresale is Ownable, ReentrancyGuard {
+    IERC20 public immutable usdcToken;
+
     uint256 public softCap;
     uint256 public hardCap;
     uint256 public minContribution;
@@ -22,14 +25,15 @@ contract BackroomPresale is Ownable, ReentrancyGuard {
 
     uint256 public constant SALE_DURATION = 24 hours;
 
-    mapping(address => uint256) public contributions; // ETH contributed per address
-    mapping(address => bool) public hasContributed; // Track if address contributed
+    mapping(address => uint256) public contributions; // USDC contributed per address
+    mapping(address => bool) public whitelist; // Whitelisted addresses
 
     event SaleStarted(uint256 startTime, uint256 endTime);
     event ContributionMade(address indexed contributor, uint256 amount);
     event SaleFinalized(bool successful, uint256 totalRaised);
     event RefundClaimed(address indexed contributor, uint256 amount);
     event FundsWithdrawn(uint256 amount);
+    event UserWhitelisted(address indexed user);
 
     modifier onlyDuringSale() {
         require(saleStartTime > 0, "Sale not started");
@@ -45,11 +49,13 @@ contract BackroomPresale is Ownable, ReentrancyGuard {
     }
 
     constructor(
+        address _usdcToken,
         uint256 _softCap,
         uint256 _hardCap,
         uint256 _minContribution,
         uint256 _maxContribution
     ) Ownable(msg.sender) {
+        require(_usdcToken != address(0), "USDC token address cannot be zero");
         require(_softCap > 0, "Soft cap must be > 0");
         require(_hardCap > _softCap, "Hard cap must be > soft cap");
         require(_minContribution > 0, "Min contribution must be > 0");
@@ -62,10 +68,24 @@ contract BackroomPresale is Ownable, ReentrancyGuard {
             "Max contribution cannot exceed hard cap"
         );
 
+        usdcToken = IERC20(_usdcToken);
         softCap = _softCap;
         hardCap = _hardCap;
         minContribution = _minContribution;
         maxContribution = _maxContribution;
+    }
+
+    /**
+     * @dev Add multiple users to whitelist (admin only)
+     */
+    function addMultipleToWhitelist(
+        address[] calldata _users
+    ) external onlyOwner {
+        for (uint256 i = 0; i < _users.length; i++) {
+            require(_users[i] != address(0), "Invalid address");
+            whitelist[_users[i]] = true;
+            emit UserWhitelisted(_users[i]);
+        }
     }
 
     /**
@@ -85,19 +105,25 @@ contract BackroomPresale is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @dev Contribute ETH to the presale
+     * @dev Contribute USDC to the presale
      */
-    function deposit() external payable onlyDuringSale nonReentrant {
-        require(msg.value >= minContribution, "Below minimum contribution");
-        require(!hasContributed[msg.sender], "Already contributed");
-        require(msg.value <= maxContribution, "Exceeds maximum contribution");
-        require(totalRaised + msg.value <= hardCap, "Would exceed hard cap");
+    function deposit(uint256 _amount) external onlyDuringSale nonReentrant {
+        require(whitelist[msg.sender], "Address not whitelisted");
+        require(_amount >= minContribution, "Below minimum contribution");
+        require(contributions[msg.sender] == 0, "Already contributed");
+        require(_amount <= maxContribution, "Exceeds maximum contribution");
+        require(totalRaised + _amount <= hardCap, "Would exceed hard cap");
 
-        contributions[msg.sender] = msg.value;
-        hasContributed[msg.sender] = true;
-        totalRaised += msg.value;
+        // Transfer USDC from user to this contract
+        require(
+            usdcToken.transferFrom(msg.sender, address(this), _amount),
+            "USDC transfer failed"
+        );
 
-        emit ContributionMade(msg.sender, msg.value);
+        contributions[msg.sender] = _amount;
+        totalRaised += _amount;
+
+        emit ContributionMade(msg.sender, _amount);
 
         if (totalRaised >= hardCap) {
             _finalizeSale();
@@ -132,15 +158,16 @@ contract BackroomPresale is Ownable, ReentrancyGuard {
      */
     function claimRefund() external onlyAfterSale nonReentrant {
         require(!saleSuccessful, "Sale was successful, no refunds");
-        require(hasContributed[msg.sender], "No contribution found");
 
         uint256 refundAmount = contributions[msg.sender];
-        require(refundAmount > 0, "No refund available");
+        require(refundAmount > 0, "No contribution found");
 
-        hasContributed[msg.sender] = false;
+        contributions[msg.sender] = 0;
 
-        (bool success, ) = payable(msg.sender).call{value: refundAmount}("");
-        require(success, "Refund transfer failed");
+        require(
+            usdcToken.transfer(msg.sender, refundAmount),
+            "USDC refund transfer failed"
+        );
 
         emit RefundClaimed(msg.sender, refundAmount);
     }
@@ -151,15 +178,13 @@ contract BackroomPresale is Ownable, ReentrancyGuard {
     function withdrawFunds() external onlyOwner onlyAfterSale {
         require(saleSuccessful, "Sale was not successful");
 
-        uint256 amount = address(this).balance;
+        uint256 amount = usdcToken.balanceOf(address(this));
         require(amount > 0, "No funds to withdraw");
 
-        (bool success, ) = payable(owner()).call{value: amount}("");
-        require(success, "Withdrawal failed");
+        require(usdcToken.transfer(owner(), amount), "USDC withdrawal failed");
 
         emit FundsWithdrawn(amount);
     }
-
     // ************************************
     // ********** View Functions **********
     // ************************************
@@ -192,8 +217,8 @@ contract BackroomPresale is Ownable, ReentrancyGuard {
      */
     function getContributionInfo(
         address _contributor
-    ) external view returns (uint256 _contribution, bool _hasContributed) {
-        return (contributions[_contributor], hasContributed[_contributor]);
+    ) external view returns (uint256 _contribution, bool _isWhitelisted) {
+        return (contributions[_contributor], whitelist[_contributor]);
     }
 
     /**
@@ -221,10 +246,10 @@ contract BackroomPresale is Ownable, ReentrancyGuard {
         );
         require(totalRaised > 0, "No contributions");
 
-        uint256 contributorETH = contributions[_contributor];
-        if (contributorETH == 0) return 0;
+        uint256 contributorUSDC = contributions[_contributor];
+        if (contributorUSDC == 0) return 0;
 
-        // UserTokens = (User ETH / Total ETH Raised) × Total Allocated Tokens
-        return (contributorETH * _totalTokensAllocated) / totalRaised;
+        // UserTokens = (User USDC / Total USDC Raised) × Total Allocated Tokens
+        return (contributorUSDC * _totalTokensAllocated) / totalRaised;
     }
 }

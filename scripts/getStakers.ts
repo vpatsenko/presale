@@ -36,9 +36,10 @@ async function getStakers() {
 	console.log(`Processing ${blocksToProcess} blocks in ${totalChunks} chunks`);
 
 	for (let i = CREATION_BLOCK; i < latestBlock; i += BLOCK_SIZE) {
+		const endBlock = Math.min(i + BLOCK_SIZE, latestBlock);
 
-		let withdrawLogs = await stakingContract.queryFilter(withdrawFilter, i, i + BLOCK_SIZE);
-		let stakeLogs = await stakingContract.queryFilter(stakeFilter, i, i + BLOCK_SIZE);
+		let withdrawLogs = await stakingContract.queryFilter(withdrawFilter, i, endBlock);
+		let stakeLogs = await stakingContract.queryFilter(stakeFilter, i, endBlock);
 
 		stakeLogs.forEach((log: any) => {
 			const user = log.args.user;

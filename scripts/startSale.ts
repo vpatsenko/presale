@@ -14,7 +14,7 @@ async function main(): Promise<void> {
 	console.log("- Owner:", owner.address);
 
 
-	const BackroomPresaleFactory = await ethers.getContractFactory("BackroomPresale");
+	const BackroomPresaleFactory = await ethers.getContractFactory("Presale");
 	const presale = await BackroomPresaleFactory.attach(BACKROOM_PRESALE_ADDRESS) as BackroomPresale;
 
 	console.log("\n2. Initial contract state:");

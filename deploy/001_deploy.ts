@@ -32,28 +32,35 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 	if (!process.env.MAX_CONTRIBUTION) {
 		throw new Error("MAX_CONTRIBUTION environment variable is required");
 	}
+	if (!process.env.USDC_ADDRESS) {
+		throw new Error("USDC_ADDRESS environment variable is required");
+	}
 
 	// Get parameters from environment variables
-	const softCap = ethers.formatEther(process.env.SOFT_CAP);
-	const hardCap = ethers.formatEther(process.env.HARD_CAP);
-	const minContribution = ethers.formatEther(process.env.MIN_CONTRIBUTION);
-	const maxContribution = ethers.formatEther(process.env.MAX_CONTRIBUTION);
+	const softCap = ethers.formatUnits(process.env.SOFT_CAP, 6);
+	const hardCap = ethers.formatUnits(process.env.HARD_CAP, 6);
+	const minContribution = ethers.formatUnits(process.env.MIN_CONTRIBUTION, 6);
+	const maxContribution = ethers.formatUnits(process.env.MAX_CONTRIBUTION, 6);
+	const usdcToken = process.env.USDC_ADDRESS;
 
 
 	console.log("Deployment parameters:");
-	console.log("- Soft Cap:", softCap, "ETH");
-	console.log("- Hard Cap:", hardCap, "ETH");
-	console.log("- Min Contribution:", minContribution, "ETH");
-	console.log("- Max Contribution:", maxContribution, "ETH");
+
+	console.log("- USDC Token:", usdcToken);
+	console.log("- Soft Cap:", softCap, "USDC");
+	console.log("- Hard Cap:", hardCap, "USDC");
+	console.log("- Min Contribution:", minContribution, "USDC");
+	console.log("- Max Contribution:", maxContribution, "USDC");
 
 	// Deploy the contract using hardhat-deploy
-	const deployment = await deploy("BackroomPresale", {
+	const deployment = await deploy("Presale", {
 		from: deployer,
 		args: [
-			ethers.parseEther(softCap),
-			ethers.parseEther(hardCap),
-			ethers.parseEther(minContribution),
-			ethers.parseEther(maxContribution)
+			usdcToken,
+			ethers.parseUnits(softCap, 6),
+			ethers.parseUnits(hardCap, 6),
+			ethers.parseUnits(minContribution, 6),
+			ethers.parseUnits(maxContribution, 6)
 		],
 		log: true,
 		waitConfirmations: 1,
@@ -64,4 +71,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 };
 
 export default func;
-func.tags = ["BackroomPresale"];
+
+func.tags = ["Presale"];
+
+// - soft cap = 1 usdc
+// - hard cap tbd (предварительно 20к)
+// - максиальная продолжительность 24ч
+// - персональный мин\макс 100\1000 usdc

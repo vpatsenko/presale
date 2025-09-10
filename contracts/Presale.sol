@@ -6,10 +6,10 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
- * @title BackroomPresale
+ * @title Presale
  * @dev Presale contract for Backroom token with USDC contributions
  */
-contract BackroomPresale is Ownable, ReentrancyGuard {
+contract Presale is Ownable, ReentrancyGuard {
     IERC20 public immutable usdcToken;
 
     uint256 public softCap;

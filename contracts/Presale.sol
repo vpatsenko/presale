@@ -4,12 +4,15 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title Presale
  * @dev Presale contract for Backroom token with USDC contributions
  */
 contract Presale is Ownable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
     IERC20 public immutable usdcToken;
 
     uint256 public softCap;
@@ -115,10 +118,7 @@ contract Presale is Ownable, ReentrancyGuard {
         require(totalRaised + _amount <= hardCap, "Would exceed hard cap");
 
         // Transfer USDC from user to this contract
-        require(
-            usdcToken.transferFrom(msg.sender, address(this), _amount),
-            "USDC transfer failed"
-        );
+        usdcToken.safeTransferFrom(msg.sender, address(this), _amount);
 
         contributions[msg.sender] = _amount;
         totalRaised += _amount;
@@ -164,10 +164,7 @@ contract Presale is Ownable, ReentrancyGuard {
 
         contributions[msg.sender] = 0;
 
-        require(
-            usdcToken.transfer(msg.sender, refundAmount),
-            "USDC refund transfer failed"
-        );
+        usdcToken.safeTransfer(msg.sender, refundAmount);
 
         emit RefundClaimed(msg.sender, refundAmount);
     }
@@ -181,7 +178,7 @@ contract Presale is Ownable, ReentrancyGuard {
         uint256 amount = usdcToken.balanceOf(address(this));
         require(amount > 0, "No funds to withdraw");
 
-        require(usdcToken.transfer(owner(), amount), "USDC withdrawal failed");
+        usdcToken.safeTransfer(owner(), amount);
 
         emit FundsWithdrawn(amount);
     }

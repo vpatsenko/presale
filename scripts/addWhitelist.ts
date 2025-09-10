@@ -8,6 +8,10 @@ dotenv.config();
 
 const PRESALE_ADDRESS = process.env.BACKROOM_PRESALE_ADDRESS || "";
 
+const whitelistedAddresses = [
+	"0x3594d081447dFf7583FeB9861Ec6b9FEfF553b3b"
+];
+
 
 
 async function addToWhitelist(contract: any, addresses: string[], batchSize: number = 50): Promise<void> {
@@ -61,11 +65,10 @@ async function main(): Promise<void> {
 		process.exit(1);
 	}
 
-	const whitelistedAddress = "0x3594d081447dFf7583FeB9861Ec6b9FEfF553b3b";
 	const presaleContract = await ethers.getContractAt("Presale", PRESALE_ADDRESS);
 
 	try {
-		await addToWhitelist(presaleContract, [whitelistedAddress]);
+		await addToWhitelist(presaleContract, whitelistedAddresses);
 
 		console.log("\n🎉 Whitelist update completed successfully!");
 		console.log(`✅ Added ${whitelistedAddress} addresses to the whitelist`);

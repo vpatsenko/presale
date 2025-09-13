@@ -16,9 +16,6 @@ contract Presale is Ownable, ReentrancyGuard {
     IERC20 public immutable usdcToken;
 
     uint256 public softCap;
-    uint256 public hardCap;
-    uint256 public minContribution;
-    uint256 public maxContribution;
 
     uint256 public saleStartTime;
     uint256 public saleEndTime;
@@ -29,20 +26,19 @@ contract Presale is Ownable, ReentrancyGuard {
     uint256 public constant SALE_DURATION = 24 hours;
 
     mapping(address => uint256) public contributions; // USDC contributed per address
-    mapping(address => bool) public whitelist; // Whitelisted addresses
+    mapping(address => uint256) public whitelist; // Whitelisted addresses
 
     event SaleStarted(uint256 startTime, uint256 endTime);
     event ContributionMade(address indexed contributor, uint256 amount);
     event SaleFinalized(bool successful, uint256 totalRaised);
     event RefundClaimed(address indexed contributor, uint256 amount);
     event FundsWithdrawn(uint256 amount);
-    event UserWhitelisted(address indexed user);
+    event UserWhitelisted(address indexed user, uint8 tier);
 
     modifier onlyDuringSale() {
         require(saleStartTime > 0, "Sale not started");
         require(block.timestamp >= saleStartTime, "Sale not started");
         require(block.timestamp <= saleEndTime, "Sale ended");
-        require(totalRaised < hardCap, "Hard cap reached");
         _;
     }
 
@@ -51,43 +47,30 @@ contract Presale is Ownable, ReentrancyGuard {
         _;
     }
 
-    constructor(
-        address _usdcToken,
-        uint256 _softCap,
-        uint256 _hardCap,
-        uint256 _minContribution,
-        uint256 _maxContribution
-    ) Ownable(msg.sender) {
+    constructor(address _usdcToken, uint256 _softCap) Ownable(msg.sender) {
         require(_usdcToken != address(0), "USDC token address cannot be zero");
         require(_softCap > 0, "Soft cap must be > 0");
-        require(_hardCap > _softCap, "Hard cap must be > soft cap");
-        require(_minContribution > 0, "Min contribution must be > 0");
-        require(
-            _maxContribution >= _minContribution,
-            "Max must be >= min contribution"
-        );
-        require(
-            _maxContribution <= _hardCap,
-            "Max contribution cannot exceed hard cap"
-        );
 
         usdcToken = IERC20(_usdcToken);
         softCap = _softCap;
-        hardCap = _hardCap;
-        minContribution = _minContribution;
-        maxContribution = _maxContribution;
     }
 
     /**
      * @dev Add multiple users to whitelist (admin only)
      */
     function addMultipleToWhitelist(
-        address[] calldata _users
+        address[] calldata _users,
+        uint8[] calldata _tiers
     ) external onlyOwner {
+        require(
+            _users.length == _tiers.length,
+            "Users and tiers must have the same length"
+        );
         for (uint256 i = 0; i < _users.length; i++) {
             require(_users[i] != address(0), "Invalid address");
-            whitelist[_users[i]] = true;
-            emit UserWhitelisted(_users[i]);
+
+            whitelist[_users[i]] = _tiers[i];
+            emit UserWhitelisted(_users[i], _tiers[i]);
         }
     }
 
@@ -111,11 +94,12 @@ contract Presale is Ownable, ReentrancyGuard {
      * @dev Contribute USDC to the presale
      */
     function deposit(uint256 _amount) external onlyDuringSale nonReentrant {
-        require(whitelist[msg.sender], "Address not whitelisted");
-        require(_amount >= minContribution, "Below minimum contribution");
+        require(whitelist[msg.sender] > 0, "Address not whitelisted");
         require(contributions[msg.sender] == 0, "Already contributed");
-        require(_amount <= maxContribution, "Exceeds maximum contribution");
-        require(totalRaised + _amount <= hardCap, "Would exceed hard cap");
+        require(
+            _amount <= whitelist[msg.sender],
+            "Amount must be less than or equal to whitelist"
+        );
 
         // Transfer USDC from user to this contract
         usdcToken.safeTransferFrom(msg.sender, address(this), _amount);
@@ -124,19 +108,15 @@ contract Presale is Ownable, ReentrancyGuard {
         totalRaised += _amount;
 
         emit ContributionMade(msg.sender, _amount);
-
-        if (totalRaised >= hardCap) {
-            _finalizeSale();
-        }
     }
 
     /**
-     * @dev Finalize the sale after 24 hours or when hard cap is reached
+     * @dev Finalize the sale after 24 hours
      */
     function finalizeSale() external {
         require(!saleFinalized, "Sale already finalized");
         require(
-            block.timestamp > saleEndTime || totalRaised >= hardCap,
+            block.timestamp > saleEndTime,
             "Sale period not ended and hard cap not reached"
         );
 
@@ -215,7 +195,7 @@ contract Presale is Ownable, ReentrancyGuard {
     function getContributionInfo(
         address _contributor
     ) external view returns (uint256 _contribution, bool _isWhitelisted) {
-        return (contributions[_contributor], whitelist[_contributor]);
+        return (contributions[_contributor], whitelist[_contributor] > 0);
     }
 
     /**

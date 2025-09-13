@@ -65,8 +65,6 @@ async function getStakers() {
 			const id = BigInt(log.args.id);
 			const autoRenew = log.args.autoRenew;
 
-			console.log(`autoRenew ${user} ${id} ${autoRenew}`);
-
 			const stake = stakers.get(user)?.get(id);
 			if (stake) {
 				stake.autoRenew = autoRenew;
@@ -80,8 +78,13 @@ async function getStakers() {
 
 	stakers.forEach((stakes, address) => {
 		stakes.forEach((stake, id) => {
+			if (address=="0x36F6158ec445475B50387ECa09de977a8d194358"){
+				console.log(`stake: ${address} ${id} ${stake.amount} ${stake.autoRenew}`);
+			}
 			if (stake.autoRenew) {
-				stakersCleared.set(address, stakersCleared.get(address) || BigInt(0) + stake.amount);
+				const currentAmount = stakersCleared.get(address) || BigInt(0);
+
+				stakersCleared.set(address, currentAmount + stake.amount);
 			}
 		});
 

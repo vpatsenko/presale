@@ -15,13 +15,11 @@ contract Presale is Ownable, ReentrancyGuard {
 
     IERC20 public immutable usdcToken;
 
-    uint256 public softCap;
-
     uint256 public saleStartTime;
     uint256 public saleEndTime;
     uint256 public totalRaised;
     bool public saleFinalized; // Has sale been finalized
-    bool public saleSuccessful; // Did sale meet soft cap
+    bool public saleSuccessful; // Was sale successful
 
     uint256 public constant SALE_DURATION = 24 hours;
 
@@ -31,9 +29,8 @@ contract Presale is Ownable, ReentrancyGuard {
     event SaleStarted(uint256 startTime, uint256 endTime);
     event ContributionMade(address indexed contributor, uint256 amount);
     event SaleFinalized(bool successful, uint256 totalRaised);
-    event RefundClaimed(address indexed contributor, uint256 amount);
     event FundsWithdrawn(uint256 amount);
-    event UserWhitelisted(address indexed user, uint8 tier);
+    event UserWhitelisted(address indexed user, uint256 tier);
 
     modifier onlyDuringSale() {
         require(saleStartTime > 0, "Sale not started");
@@ -47,12 +44,10 @@ contract Presale is Ownable, ReentrancyGuard {
         _;
     }
 
-    constructor(address _usdcToken, uint256 _softCap) Ownable(msg.sender) {
+    constructor(address _usdcToken) Ownable(msg.sender) {
         require(_usdcToken != address(0), "USDC token address cannot be zero");
-        require(_softCap > 0, "Soft cap must be > 0");
 
         usdcToken = IERC20(_usdcToken);
-        softCap = _softCap;
     }
 
     /**
@@ -60,7 +55,7 @@ contract Presale is Ownable, ReentrancyGuard {
      */
     function addMultipleToWhitelist(
         address[] calldata _users,
-        uint8[] calldata _tiers
+        uint256[] calldata _tiers
     ) external onlyOwner {
         require(
             _users.length == _tiers.length,
@@ -95,7 +90,10 @@ contract Presale is Ownable, ReentrancyGuard {
      */
     function deposit(uint256 _amount) external onlyDuringSale nonReentrant {
         require(whitelist[msg.sender] > 0, "Address not whitelisted");
-        require(contributions[msg.sender] == 0, "Already contributed");
+        require(
+            contributions[msg.sender] <= whitelist[msg.sender],
+            "Already contributed full amount"
+        );
         require(
             _amount <= whitelist[msg.sender],
             "Amount must be less than or equal to whitelist"
@@ -104,7 +102,7 @@ contract Presale is Ownable, ReentrancyGuard {
         // Transfer USDC from user to this contract
         usdcToken.safeTransferFrom(msg.sender, address(this), _amount);
 
-        contributions[msg.sender] = _amount;
+        contributions[msg.sender] += _amount;
         totalRaised += _amount;
 
         emit ContributionMade(msg.sender, _amount);
@@ -120,33 +118,10 @@ contract Presale is Ownable, ReentrancyGuard {
             "Sale period not ended and hard cap not reached"
         );
 
-        _finalizeSale();
-    }
-
-    /**
-     * @dev Internal function to finalize sale
-     */
-    function _finalizeSale() internal {
         saleFinalized = true;
-        saleSuccessful = totalRaised >= softCap;
+        saleSuccessful = true;
 
         emit SaleFinalized(saleSuccessful, totalRaised);
-    }
-
-    /**
-     * @dev Claim refund if sale failed (contributors only)
-     */
-    function claimRefund() external onlyAfterSale nonReentrant {
-        require(!saleSuccessful, "Sale was successful, no refunds");
-
-        uint256 refundAmount = contributions[msg.sender];
-        require(refundAmount > 0, "No contribution found");
-
-        contributions[msg.sender] = 0;
-
-        usdcToken.safeTransfer(msg.sender, refundAmount);
-
-        emit RefundClaimed(msg.sender, refundAmount);
     }
 
     /**

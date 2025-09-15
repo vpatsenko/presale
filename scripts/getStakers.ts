@@ -127,9 +127,13 @@ async function saveStakers() {
 	let csvContent = "address,staked_amount,allocation\n";
 
 	Array.from(creatorRoomHolders.entries()).forEach(([address, amount]) => {
-		const allocation = HARDCAP * BigInt(10) * (amount / totalRoomStakedByRoomHolder)
+		const amountWIthoutDecimals = amount / BigInt(10**18);
+		const totalRoomStakedByRoomHolderWithoutDecimals = totalRoomStakedByRoomHolder / BigInt(10**18);
 
-		csvContent += `${address},${ethers.formatUnits(amount, 18)},${ethers.formatUnits(allocation, 18)} \n`;
+		const allocation =( HARDCAP * BigInt(10) * amountWIthoutDecimals) / totalRoomStakedByRoomHolderWithoutDecimals
+
+
+		csvContent += `${address},${ethers.formatUnits(amount, 18)},${allocation} \n`;
 	});
 
 	fs.writeFileSync("stakers.csv", csvContent);

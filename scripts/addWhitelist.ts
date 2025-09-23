@@ -2,10 +2,15 @@ import { run, ethers } from "hardhat";
 import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
+import { bigint } from "hardhat/internal/core/params/argumentTypes";
 dotenv.config();
 
 const PRESALE_ADDRESS = process.env.BACKROOM_PRESALE_ADDRESS || "";
-const addresses : { address: string, tier: string }[] = [];
+const addresses : AddressWithTier[] = [];
+interface AddressWithTier {
+	address: string;
+	tier: string;
+}
 
 function readWhitelistCSV(csvPath: string): void {
 	const csvContent = fs.readFileSync(csvPath, 'utf8');
@@ -20,7 +25,7 @@ function readWhitelistCSV(csvPath: string): void {
 }
 
 
-async function addToWhitelist(contract: any, addresses: string[], batchSize: number = 50): Promise<void> {
+async function addToWhitelist(contract: any, addresses: AddressWithTier[], batchSize: number = 50): Promise<void> {
 	const totalBatches = Math.ceil(addresses.length / batchSize);
 
 	for (let i = 0; i < totalBatches; i++) {
@@ -30,8 +35,13 @@ async function addToWhitelist(contract: any, addresses: string[], batchSize: num
 
 		console.log(`\nProcessing batch ${i + 1}/${totalBatches} (${batch.length} addresses)...`);
 
+		const addressesToSet = batch.map((addressesWithTier: AddressWithTier) => addressesWithTier.address);
+		const  tiers = batch.map((addressesWithTier: AddressWithTier) =>  BigInt(addressesWithTier.tier) * 10n**6n);
+
+		console.log(addressesToSet, tiers);
+
 		try {
-			const tx = await contract.addMultipleToWhitelist(batch);
+			const tx = await contract.addMultipleToWhitelist(addressesToSet, tiers);
 			console.log(`Transaction submitted: ${tx.hash}`);
 
 			const receipt = await tx.wait();
@@ -65,21 +75,20 @@ async function main(): Promise<void> {
 
 	readWhitelistCSV('./stakers.csv');
 
-	addresses.forEach(async (address) => {
-		console.log(`Adding ${address.address} to whitelist with tier ${address.tier}`);
-	});
+	// addresses.forEach(async (address) => {
+	// 	console.log(`Adding ${address.address} to whitelist with tier ${address.tier}`);
+	// });
 
-	// try {
-	// 	await addToWhitelist(presaleContract, whitelistedAddresses);
+	try {
+		await addToWhitelist(presaleContract, addresses);
 
-	// 	console.log("\n🎉 Whitelist update completed successfully!");
-	// 	console.log(`✅ Added ${whitelistedAddresses.length} addresses to the whitelist`);
+		console.log("\n Whitelist update completed successfully!");
 
 
-	// } catch (error: any) {
-	// 	console.error("\n❌ Failed to add addresses to whitelist:", error.message);
-	// 	process.exit(1);
-	// }
+	} catch (error: any) {
+		console.error("\n❌ Failed to add addresses to whitelist:", error.message);
+		process.exit(1);
+	}
 }
 
 main()

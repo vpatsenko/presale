@@ -16,7 +16,7 @@ interface Config {
 }
 
 const CONFIG: Config = {
-    roomTokenAddress: "0x6555255b8dEd3c538Cb398d9E36769f45D7d3ea7",
+    roomTokenAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
     batchSize: 100
 };
 
@@ -59,9 +59,11 @@ async function distributeTokens(allocations: PresaleAllocation[]): Promise<void>
         try {
             console.log(`[${i + 1}/${allocations.length}] Transferring ${allocation.amount} tokens to ${allocation.address}...`);
 
+            const amountInUSDc = ethers.parseUnits(allocation.amount, 6);
+
             const tx = await tokenContract.transfer(
                 allocation.address,
-                allocation.amount
+                amountInUSDc
             );
 
             await tx.wait();
@@ -79,7 +81,7 @@ async function main(): Promise<void> {
 
     try {
         console.log("📄 Loading presale allocations...");
-        const presaleAllocPath = path.join(__dirname, '..', 'distribution.csv');
+        const presaleAllocPath = path.join(__dirname, '..', 'Sunny refunds.csv');
         const csvContent = fs.readFileSync(presaleAllocPath, 'utf-8');
         const allocations = CSVParser.parsePresaleAllocations(csvContent);
 
@@ -98,3 +100,7 @@ main()
         console.error("Script failed:", error);
         process.exit(1);
     });
+
+// 0x61a1d40346bdedf611cd3c89916894c6f8b8d63e,327.63
+// 0xa9597e0dcd1be1c49ed844e1ba288893ccca1327,1979.26
+// 0xe673f5e474dbf76a1230fea52e8e58f4baca151c,3035.47

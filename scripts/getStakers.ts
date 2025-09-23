@@ -29,9 +29,14 @@ interface Stake {
     autoRenew: boolean;
 }
 
+interface CreatorRoomHolder {
+    roomBalance: bigint;
+    keysBalance: bigint;
+}
+
 const stakers = new Map<string, Map<bigint, Stake>>();
-const stakersCleared = new Map<string, bigint>();
-const creatorRoomHolders = new Map<string, bigint>();
+const stakersCleared = new Map<string, CreatorRoomHolder>();
+const creatorRoomHolders = new Map<string, CreatorRoomHolder>();
 
 let totalRoomStakedByRoomHolder = BigInt(0);
 
@@ -54,8 +59,6 @@ async function getStakers() {
     const blocksToProcess = latestBlock - CREATION_BLOCK;
     const totalChunks = Math.ceil(blocksToProcess / BLOCK_SIZE);
     let currentChunk = 0;
-
-    // latestBlock = CREATION_BLOCK +1_000;
 
     for (let i = CREATION_BLOCK; i < latestBlock; i += BLOCK_SIZE) {
         const endBlock = Math.min(i + BLOCK_SIZE, latestBlock);
@@ -102,24 +105,6 @@ async function getStakers() {
         console.log(`Processed chunk ${currentChunk} of ${totalChunks}`);
     }
 
-    stakers.forEach((stakes, address) => {
-        stakes.forEach((stake, id) => {
-            if (address == '0x36F6158ec445475B50387ECa09de977a8d194358') {
-                console.log(
-                    `stake: ${address} ${id} ${stake.amount} ${stake.autoRenew}`
-                );
-            }
-            if (stake.autoRenew) {
-                const currentAmount = stakersCleared.get(address) || BigInt(0);
-
-                stakersCleared.set(address, currentAmount + stake.amount);
-            }
-        });
-    });
-
-    // stakersCleared.set("0x9ECAd9d9D3ED0938Cc3b84732D3FFa8ECe3a87c8", BigInt(10) * BigInt(10**18));
-    // stakersCleared.set("0x70aCC72c048678F6F006aF8b194A6102c490Bc40", BigInt(10) * BigInt(10**18));
-
     for (const [address, amount] of stakersCleared.entries()) {
         const balance = await backroomContract.sharesBalance(
             BACKROOM_CREATOR,
@@ -127,17 +112,16 @@ async function getStakers() {
         );
         console.log(`${address} balance: ${balance}`);
 
-        if (balance > BigInt(0)) {
-            totalRoomStakedByRoomHolder += amount;
+        const roomEntry = stakersCleared.get(address);
+        const roomBalance = roomEntry?.roomBalance || BigInt(0);
 
-            const roomBalance = stakersCleared.get(address);
-            creatorRoomHolders.set(address, roomBalance || BigInt(0));
-        }
+        creatorRoomHolders.set(address, {
+            roomBalance: roomBalance,
+            keysBalance: balance,
+        });
+
+        totalRoomStakedByRoomHolder += amount.roomBalance;
     }
-
-    // backroomContract.sharesBalance(BACKROOM_CREATOR, "0x9ECAd9d9D3ED0938Cc3b84732D3FFa8ECe3a87c8").then((balance: bigint) => {
-    // 	console.log("Balance:", balance);
-    // });
 
     console.log(
         'Total room staked by holders:',
@@ -146,21 +130,14 @@ async function getStakers() {
 }
 
 async function saveStakers() {
-    let csvContent = 'address,staked_amount,allocation\n';
+    let csvContent = 'address,staked_amount,keys_amount\n';
 
-    Array.from(creatorRoomHolders.entries()).forEach(([address, amount]) => {
-        const amountWIthoutDecimals = amount / BigInt(10 ** 18);
-        const totalRoomStakedByRoomHolderWithoutDecimals =
-            totalRoomStakedByRoomHolder / BigInt(10 ** 18);
-
-        const allocation =
-            (HARDCAP * BigInt(10) * amountWIthoutDecimals) /
-            totalRoomStakedByRoomHolderWithoutDecimals;
-
+    Array.from(creatorRoomHolders.entries()).forEach(([address, entry]) => {
+        const amountWIthoutDecimals = entry.roomBalance / BigInt(10 ** 18);
         csvContent += `${address},${ethers.formatUnits(
-            amount,
+            entry.roomBalance,
             18
-        )},${allocation} \n`;
+        )},${ethers.formatUnits(entry.keysBalance, 18)} \n`;
     });
 
     fs.writeFileSync('stakers.csv', csvContent);

@@ -105,6 +105,23 @@ async function getStakers() {
         console.log(`Processed chunk ${currentChunk} of ${totalChunks}`);
     }
 
+    stakers.forEach((stakes, address) => {
+        stakes.forEach((stake, id) => {
+            if (stake.autoRenew) {
+                const currentEntry = stakersCleared.get(address);
+
+                const currentAmount = currentEntry?.roomBalance || BigInt(0);
+                const currentKeysAmount =
+                    currentEntry?.keysBalance || BigInt(0);
+
+                stakersCleared.set(address, {
+                    roomBalance: currentAmount + stake.amount,
+                    keysBalance: currentKeysAmount,
+                });
+            }
+        });
+    });
+
     for (const [address, amount] of stakersCleared.entries()) {
         const balance = await backroomContract.sharesBalance(
             BACKROOM_CREATOR,
@@ -137,7 +154,7 @@ async function saveStakers() {
         csvContent += `${address},${ethers.formatUnits(
             entry.roomBalance,
             18
-        )},${ethers.formatUnits(entry.keysBalance, 18)} \n`;
+        )},${entry.keysBalance.toString()} \n`;
     });
 
     fs.writeFileSync('stakers.csv', csvContent);

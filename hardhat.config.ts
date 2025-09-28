@@ -1,65 +1,86 @@
-import { HardhatUserConfig } from "hardhat/config";
-import "@nomicfoundation/hardhat-ethers";
-import "@nomicfoundation/hardhat-verify";
+import { HardhatUserConfig } from 'hardhat/config';
+import '@nomicfoundation/hardhat-ethers';
+import '@nomicfoundation/hardhat-verify';
 import 'hardhat-deploy';
-import "@nomicfoundation/hardhat-toolbox";
-import dotenv from "dotenv";
+import '@nomicfoundation/hardhat-toolbox';
+import dotenv from 'dotenv';
 
 dotenv.config();
 
-const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "";
+const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || '';
 
 const config: HardhatUserConfig = {
-  solidity: "0.8.20",
-  networks: {
-    hardhat: {},
-    baseFork: {
-      url: "http://127.0.0.1:8545/",
-      forking: {
-        url: process.env.RPC_URL_BASE || "",
-      },
-      accounts: process.env.ADMIN_PRIVATE_KEY ? [process.env.ADMIN_PRIVATE_KEY] : []
+    solidity: '0.8.20',
+    networks: {
+        hardhat: {},
+        baseFork: {
+            url: 'http://127.0.0.1:8545/',
+            forking: {
+                url: process.env.RPC_URL_BASE || '',
+            },
+            accounts: process.env.ADMIN_PRIVATE_KEY
+                ? [process.env.ADMIN_PRIVATE_KEY]
+                : [],
+        },
+        baseSepolia: {
+            url: process.env.RPC_URL_BASE_SEPOLIA || '',
+            accounts: process.env.ADMIN_MNEMONIC
+                ? { mnemonic: process.env.ADMIN_MNEMONIC }
+                : [],
+        },
+        base: {
+            url: process.env.RPC_URL_BASE || '',
+            accounts: process.env.ADMIN_MNEMONIC
+                ? { mnemonic: process.env.ADMIN_MNEMONIC }
+                : [],
+        },
+        plasma: {
+            url: process.env.RPC_URL_PLASMA || '',
+            accounts: process.env.ADMIN_MNEMONIC
+                ? { mnemonic: process.env.ADMIN_MNEMONIC }
+                : [],
+        },
     },
-    baseSepolia: {
-      url: process.env.RPC_URL_BASE_SEPOLIA || "",
-      accounts: process.env.ADMIN_MNEMONIC ? { mnemonic: process.env.ADMIN_MNEMONIC } : []
+    namedAccounts: {
+        deployer: {
+            default: 0, // here this will by default take the first account as deployer
+        },
     },
-    base: {
-      url: process.env.RPC_URL_BASE || "",
-      accounts: process.env.ADMIN_MNEMONIC ? { mnemonic: process.env.ADMIN_MNEMONIC } : []
-    }
-  },
-  namedAccounts: {
-    deployer: {
-      default: 0, // here this will by default take the first account as deployer
+    sourcify: {
+        // Disabled by default
+        // Doesn't need an API key
+        enabled: true,
     },
-  },
-  sourcify: {
-    // Disabled by default
-    // Doesn't need an API key
-    enabled: true
-  },
-  etherscan: {
-    apiKey: ETHERSCAN_API_KEY,
-    customChains: [
-      {
-        network: "base",
-        chainId: 8453,
-        urls: {
-          apiURL: "https://api.etherscan.io/v2/api?chainid=8453",
-          browserURL: "https://basescan.org"
-        }
-      },
-      {
-        network: "baseSepolia",
-        chainId: 84532,
-        urls: {
-          apiURL: "https://api.etherscan.io/v2/api?chainid=84532",
-          browserURL: "https://sepolia.basescan.org"
-        }
-      }
-    ]
-  },
+    etherscan: {
+        apiKey: ETHERSCAN_API_KEY,
+        customChains: [
+            {
+                network: 'plasma',
+                chainId: 9745,
+                urls: {
+                    apiURL: 'https://api.routescan.io/v2/network/mainnet/evm/9745/etherscan',
+                    browserURL: 'https://routescan.io',
+                },
+            },
+            {
+                network: 'base',
+                chainId: 8453,
+                urls: {
+                    apiURL: 'https://api.etherscan.io/v2/api?chainid=8453',
+                    browserURL: 'https://plasmascan.to/',
+                },
+            },
+            {
+                network: 'baseSepolia',
+                chainId: 84532,
+                urls: {
+                    apiURL: 'https://api.etherscan.io/v2/api?chainid=84532',
+                    browserURL: 'https://sepolia.basescan.org',
+                },
+            },
+        ],
+    },
 };
 
 export default config;
+// https://api.routescan.io/v2/network/mainnet/evm/9745/etherscan

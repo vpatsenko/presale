@@ -607,6 +607,391 @@ describe('Staking', function () {
         });
     });
 
+    describe('Pagination Methods', function () {
+        beforeEach(async function () {
+            // Create multiple users and positions for pagination testing
+            const users = [user1, user2, user3];
+            const amounts = [
+                ethers.parseUnits('100', 6),
+                ethers.parseUnits('200', 6),
+                ethers.parseUnits('300', 6),
+            ];
+
+            // Each user stakes multiple times
+            for (let i = 0; i < users.length; i++) {
+                const user = users[i];
+                const totalAmount = amounts[i] * 3n; // 3 positions per user
+
+                await roomToken
+                    .connect(user)
+                    .approve(await staking.getAddress(), totalAmount);
+
+                // Create 3 positions per user
+                for (let j = 0; j < 3; j++) {
+                    await staking.connect(user).stake(amounts[i]);
+                }
+            }
+
+            // Change some positions to different statuses
+            // User 1: position 1 (active), position 2 (pending), position 3 (active)
+            await staking.connect(user1).unstake(2);
+
+            // User 2: position 4 (active), position 5 (pending), position 6 (active)
+            await staking.connect(user2).unstake(5);
+
+            // User 3: position 7 (active), position 8 (active), position 9 (active)
+            // All positions remain active
+        });
+
+        describe('getAllStakersWithPagination', function () {
+            it('Should return correct stakers with pagination', async function () {
+                // Test first page
+                const firstPage = await staking.getAllStakersWithPagination(
+                    0,
+                    2
+                );
+                expect(firstPage.length).to.equal(2);
+                expect(firstPage[0]).to.equal(user1.address);
+                expect(firstPage[1]).to.equal(user2.address);
+
+                // Test second page
+                const secondPage = await staking.getAllStakersWithPagination(
+                    2,
+                    2
+                );
+                expect(secondPage.length).to.equal(1);
+                expect(secondPage[0]).to.equal(user3.address);
+
+                // Test with limit larger than available
+                const allStakers = await staking.getAllStakersWithPagination(
+                    0,
+                    10
+                );
+                expect(allStakers.length).to.equal(3);
+            });
+
+            it('Should handle edge cases for getAllStakersWithPagination', async function () {
+                // Test offset beyond available stakers
+                const emptyResult = await staking.getAllStakersWithPagination(
+                    10,
+                    5
+                );
+                expect(emptyResult.length).to.equal(5); // Returns array of limit size with zero addresses
+
+                // Test with zero limit
+                const zeroLimit = await staking.getAllStakersWithPagination(
+                    0,
+                    0
+                );
+                expect(zeroLimit.length).to.equal(0);
+            });
+        });
+
+        describe('getAllPositionsByStatusWithPagination', function () {
+            it('Should return active positions with pagination', async function () {
+                const activePositions =
+                    await staking.getAllPositionsByStatusWithPagination(
+                        1,
+                        0,
+                        5
+                    ); // PositionStatus.Active = 1
+
+                // Should return positions with status Active
+                expect(activePositions.length).to.equal(5);
+                for (let i = 0; i < activePositions.length; i++) {
+                    if (activePositions[i].owner !== ethers.ZeroAddress) {
+                        expect(activePositions[i].status).to.equal(1); // PositionStatus.Active
+                    }
+                }
+            });
+
+            it('Should return pending positions with pagination', async function () {
+                const pendingPositions =
+                    await staking.getAllPositionsByStatusWithPagination(
+                        2,
+                        0,
+                        5
+                    ); // PositionStatus.Pending = 2
+
+                // Should return positions with status Pending
+                expect(pendingPositions.length).to.equal(5);
+                for (let i = 0; i < pendingPositions.length; i++) {
+                    if (pendingPositions[i].owner !== ethers.ZeroAddress) {
+                        expect(pendingPositions[i].status).to.equal(2); // PositionStatus.Pending
+                    }
+                }
+            });
+
+            it('Should handle non-existent status', async function () {
+                const claimedPositions =
+                    await staking.getAllPositionsByStatusWithPagination(
+                        3,
+                        0,
+                        5
+                    ); // PositionStatus.Claimed = 3
+
+                // Should return empty positions since no positions are claimed yet
+                expect(claimedPositions.length).to.equal(5);
+                for (let i = 0; i < claimedPositions.length; i++) {
+                    expect(claimedPositions[i].owner).to.equal(
+                        ethers.ZeroAddress
+                    );
+                }
+            });
+
+            it('Should handle edge cases for getAllPositionsByStatusWithPagination', async function () {
+                // Test with offset beyond available positions
+                const emptyResult =
+                    await staking.getAllPositionsByStatusWithPagination(
+                        1,
+                        100,
+                        5
+                    );
+                expect(emptyResult.length).to.equal(5);
+
+                // Test with zero limit
+                const zeroLimit =
+                    await staking.getAllPositionsByStatusWithPagination(
+                        1,
+                        0,
+                        0
+                    );
+                expect(zeroLimit.length).to.equal(0);
+            });
+        });
+
+        describe('getAllPositionsWithPagination', function () {
+            it('Should return all positions with pagination', async function () {
+                // Test first page
+                const firstPage = await staking.getAllPositionsWithPagination(
+                    0,
+                    3
+                );
+                expect(firstPage.length).to.equal(3);
+                expect(firstPage[0].positionId).to.equal(1);
+                expect(firstPage[1].positionId).to.equal(2);
+                expect(firstPage[2].positionId).to.equal(3);
+
+                // Test second page
+                const secondPage = await staking.getAllPositionsWithPagination(
+                    3,
+                    3
+                );
+                expect(secondPage.length).to.equal(3);
+                expect(secondPage[0].positionId).to.equal(4);
+                expect(secondPage[1].positionId).to.equal(5);
+                expect(secondPage[2].positionId).to.equal(6);
+
+                // Test third page
+                const thirdPage = await staking.getAllPositionsWithPagination(
+                    6,
+                    3
+                );
+                expect(thirdPage.length).to.equal(3);
+                expect(thirdPage[0].positionId).to.equal(7);
+                expect(thirdPage[1].positionId).to.equal(8);
+                expect(thirdPage[2].positionId).to.equal(9);
+            });
+
+            it('Should handle edge cases for getAllPositionsWithPagination', async function () {
+                // Test offset beyond available positions
+                const emptyResult = await staking.getAllPositionsWithPagination(
+                    100,
+                    5
+                );
+                expect(emptyResult.length).to.equal(5);
+                for (let i = 0; i < emptyResult.length; i++) {
+                    expect(emptyResult[i].owner).to.equal(ethers.ZeroAddress);
+                }
+
+                // Test with limit larger than available
+                const allPositions =
+                    await staking.getAllPositionsWithPagination(0, 20);
+                expect(allPositions.length).to.equal(20);
+            });
+        });
+
+        describe('getUserPositionsPaginated', function () {
+            it('Should return user positions with pagination', async function () {
+                // Test user1's positions (positions 1, 2, 3)
+                const user1Page1 = await staking.getUserPositionsPaginated(
+                    user1.address,
+                    0,
+                    2
+                );
+                expect(user1Page1.length).to.equal(2);
+                expect(user1Page1[0]).to.equal(1);
+                expect(user1Page1[1]).to.equal(2);
+
+                const user1Page2 = await staking.getUserPositionsPaginated(
+                    user1.address,
+                    2,
+                    2
+                );
+                expect(user1Page2.length).to.equal(1);
+                expect(user1Page2[0]).to.equal(3);
+
+                // Test user2's positions (positions 4, 5, 6)
+                const user2Positions = await staking.getUserPositionsPaginated(
+                    user2.address,
+                    0,
+                    5
+                );
+                expect(user2Positions.length).to.equal(3);
+                expect(user2Positions[0]).to.equal(4);
+                expect(user2Positions[1]).to.equal(5);
+                expect(user2Positions[2]).to.equal(6);
+            });
+
+            it('Should handle edge cases for getUserPositionsPaginated', async function () {
+                // Test offset beyond user's positions
+                const emptyResult = await staking.getUserPositionsPaginated(
+                    user1.address,
+                    10,
+                    5
+                );
+                expect(emptyResult.length).to.equal(0);
+
+                // Test with limit larger than user's positions
+                const allUserPositions =
+                    await staking.getUserPositionsPaginated(
+                        user1.address,
+                        0,
+                        10
+                    );
+                expect(allUserPositions.length).to.equal(3);
+
+                // Test with zero limit
+                const zeroLimit = await staking.getUserPositionsPaginated(
+                    user1.address,
+                    0,
+                    0
+                );
+                expect(zeroLimit.length).to.equal(0);
+
+                // Test with offset equal to user's position count
+                const atBoundary = await staking.getUserPositionsPaginated(
+                    user1.address,
+                    3,
+                    5
+                );
+                expect(atBoundary.length).to.equal(0);
+            });
+
+            it('Should handle user with no positions', async function () {
+                const [newUser] = await ethers.getSigners();
+                const noPositions = await staking.getUserPositionsPaginated(
+                    newUser.address,
+                    0,
+                    5
+                );
+                expect(noPositions.length).to.equal(0);
+            });
+        });
+
+        describe('Pagination Edge Cases', function () {
+            it('Should handle large offset values', async function () {
+                const largeOffset = await staking.getAllStakersWithPagination(
+                    1000,
+                    5
+                );
+                expect(largeOffset.length).to.equal(5);
+
+                const largeOffsetPositions =
+                    await staking.getAllPositionsWithPagination(1000, 5);
+                expect(largeOffsetPositions.length).to.equal(5);
+            });
+
+            it('Should handle zero limit consistently', async function () {
+                const zeroLimitStakers =
+                    await staking.getAllStakersWithPagination(0, 0);
+                expect(zeroLimitStakers.length).to.equal(0);
+
+                const zeroLimitPositions =
+                    await staking.getAllPositionsWithPagination(0, 0);
+                expect(zeroLimitPositions.length).to.equal(0);
+
+                const zeroLimitUserPositions =
+                    await staking.getUserPositionsPaginated(
+                        user1.address,
+                        0,
+                        0
+                    );
+                expect(zeroLimitUserPositions.length).to.equal(0);
+            });
+
+            it('Should handle boundary conditions', async function () {
+                // Test exactly at the boundary
+                const boundaryStakers =
+                    await staking.getAllStakersWithPagination(2, 1);
+                expect(boundaryStakers.length).to.equal(1);
+                expect(boundaryStakers[0]).to.equal(user3.address);
+
+                // Test one beyond boundary
+                const beyondBoundary =
+                    await staking.getAllStakersWithPagination(3, 1);
+                expect(beyondBoundary.length).to.equal(1);
+                expect(beyondBoundary[0]).to.equal(ethers.ZeroAddress);
+            });
+        });
+
+        describe('Pagination with Position Status Changes', function () {
+            it('Should reflect status changes in pagination', async function () {
+                // Initially position 2 is pending
+                let pendingPositions =
+                    await staking.getAllPositionsByStatusWithPagination(
+                        2,
+                        0,
+                        5
+                    );
+
+                let hasPosition2 = false;
+                for (let i = 0; i < pendingPositions.length; i++) {
+                    if (pendingPositions[i].positionId === 2n) {
+                        hasPosition2 = true;
+                        break;
+                    }
+                }
+                expect(hasPosition2).to.be.true;
+
+                // Restake position 2 (changes from pending to active)
+                await staking.connect(user1).restake(2);
+
+                // Now position 2 should be in active positions, not pending
+                const activePositions =
+                    await staking.getAllPositionsByStatusWithPagination(
+                        1,
+                        0,
+                        5
+                    );
+                let hasPosition2Active = false;
+                for (let i = 0; i < activePositions.length; i++) {
+                    if (activePositions[i].positionId === 2n) {
+                        hasPosition2Active = true;
+                        break;
+                    }
+                }
+                expect(hasPosition2Active).to.be.true;
+
+                // And should not be in pending positions
+                pendingPositions =
+                    await staking.getAllPositionsByStatusWithPagination(
+                        2,
+                        0,
+                        5
+                    );
+                hasPosition2 = false;
+                for (let i = 0; i < pendingPositions.length; i++) {
+                    if (pendingPositions[i].positionId === 2n) {
+                        hasPosition2 = false;
+                        break;
+                    }
+                }
+                expect(hasPosition2).to.be.false;
+            });
+        });
+    });
+
     describe('Additional Edge Cases', function () {
         it('Should handle restaking after partial time has passed', async function () {
             await roomToken

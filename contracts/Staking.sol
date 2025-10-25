@@ -21,7 +21,7 @@ contract Staking is ReentrancyGuard, IStaking {
 
     IERC20 public immutable roomToken;
 
-    uint256 public constant COOLDOWN_PERIOD = 5 minutes;
+    uint256 public constant COOLDOWN_PERIOD = 2 * 7 * 24 * 3600; // 2 weeks in seconds
     uint256 public nextPositionId = 1;
 
     mapping(uint256 => Position) public positions;
@@ -29,6 +29,7 @@ contract Staking is ReentrancyGuard, IStaking {
     mapping(address => uint256) public totalStaked;
 
     address[] public stakers;
+    mapping(address => bool) public isRegistered;
 
     modifier onlyPositionOwner(uint256 positionId) {
         require(
@@ -73,7 +74,10 @@ contract Staking is ReentrancyGuard, IStaking {
         userPositions[msg.sender].push(positionId);
         totalStaked[msg.sender] += amount;
 
-        stakers.push(msg.sender);
+        if (!isRegistered[msg.sender]) {
+            isRegistered[msg.sender] = true;
+            stakers.push(msg.sender);
+        }
 
         emit PositionCreated(positionId, msg.sender, amount, block.timestamp);
 
@@ -171,10 +175,22 @@ contract Staking is ReentrancyGuard, IStaking {
         uint256 offset,
         uint256 limit
     ) external view returns (address[] memory) {
-        address[] memory result = new address[](limit);
+        uint256 stakersLength = stakers.length;
 
-        for (uint256 i = offset; i < offset + limit; i++) {
-            result[i - offset] = stakers[i];
+        if (offset >= stakersLength) {
+            address[] memory result = new address[](limit);
+            return result;
+        }
+
+        uint256 actualLimit = limit;
+        if (offset + limit > stakersLength) {
+            actualLimit = stakersLength - offset;
+        }
+
+        address[] memory result = new address[](actualLimit);
+
+        for (uint256 i = 0; i < actualLimit; i++) {
+            result[i] = stakers[offset + i];
         }
 
         return result;
@@ -185,12 +201,39 @@ contract Staking is ReentrancyGuard, IStaking {
         uint256 offset,
         uint256 limit
     ) external view returns (Position[] memory) {
+        // First, count how many positions match the status
+        uint256 matchCount = 0;
+        for (uint256 i = 1; i < nextPositionId; i++) {
+            if (positions[i].status == status) {
+                matchCount++;
+            }
+        }
+
         Position[] memory result = new Position[](limit);
 
-        for (uint256 i = offset; i < offset + limit; i++) {
-            Position storage position = positions[i];
-            if (position.status == status) {
-                result[i - offset] = position;
+        if (offset >= matchCount) {
+            return result;
+        }
+
+        uint256 actualLimit = limit;
+        if (offset + limit > matchCount) {
+            actualLimit = matchCount - offset;
+        }
+
+        uint256 resultIndex = 0;
+        uint256 currentOffset = 0;
+
+        for (
+            uint256 i = 1;
+            i < nextPositionId && resultIndex < actualLimit;
+            i++
+        ) {
+            if (positions[i].status == status) {
+                if (currentOffset >= offset) {
+                    result[resultIndex] = positions[i];
+                    resultIndex++;
+                }
+                currentOffset++;
             }
         }
 
@@ -201,10 +244,21 @@ contract Staking is ReentrancyGuard, IStaking {
         uint256 offset,
         uint256 limit
     ) external view returns (Position[] memory) {
+        uint256 totalPositions = nextPositionId - 1; // positions start from ID 1
+
         Position[] memory result = new Position[](limit);
 
-        for (uint256 i = offset; i < offset + limit; i++) {
-            result[i - offset] = positions[i];
+        if (offset >= totalPositions) {
+            return result;
+        }
+
+        uint256 actualLimit = limit;
+        if (offset + limit > totalPositions) {
+            actualLimit = totalPositions - offset;
+        }
+
+        for (uint256 i = 0; i < actualLimit; i++) {
+            result[i] = positions[offset + 1 + i]; // positions start from ID 1
         }
 
         return result;
@@ -233,6 +287,12 @@ contract Staking is ReentrancyGuard, IStaking {
         }
 
         return result;
+    }
+
+    function getUserPositions(
+        address user
+    ) external view returns (uint256[] memory) {
+        return userPositions[user];
     }
 
     function getUserPositionCount(

@@ -5,7 +5,8 @@ interface IStaking {
     enum PositionStatus {
         None,
         Active,
-        Pending
+        Pending,
+        Claimed
     }
 
     struct Position {
@@ -13,6 +14,7 @@ interface IStaking {
         address owner;
         uint256 amount;
         uint256 unlockTime;
+        uint256 stakeTime;
         PositionStatus status;
     }
 

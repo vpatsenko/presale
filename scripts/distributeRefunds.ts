@@ -11,12 +11,12 @@ interface PresaleAllocation {
 }
 
 interface Config {
-    roomTokenAddress: string;
+    usdcAddress: string;
     batchSize: number;
 }
 
 const CONFIG: Config = {
-    roomTokenAddress: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+    usdcAddress: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
     batchSize: 100,
 };
 
@@ -52,7 +52,7 @@ async function distributeTokens(
 ): Promise<void> {
     const [signer] = await ethers.getSigners();
     const tokenContract = new ethers.Contract(
-        CONFIG.roomTokenAddress,
+        CONFIG.usdcAddress,
         ERC20_ABI,
         signer
     );
@@ -71,6 +71,8 @@ async function distributeTokens(
             );
 
             const amountInUSDc = ethers.parseUnits(allocation.amount, 6);
+            console.log('allocation.address', allocation.address);
+            console.log('amountInUSDc', amountInUSDc);
 
             const tx = await tokenContract.transfer(
                 allocation.address,
@@ -93,7 +95,11 @@ async function main(): Promise<void> {
 
     try {
         console.log('📄 Loading presale allocations...');
-        const presaleAllocPath = path.join(__dirname, '..', 'refunds.csv');
+        const presaleAllocPath = path.join(
+            __dirname,
+            '..',
+            'faibles_refund.csv'
+        );
         const csvContent = fs.readFileSync(presaleAllocPath, 'utf-8');
         const allocations = CSVParser.parsePresaleAllocations(csvContent);
 
@@ -112,7 +118,3 @@ main()
         console.error('Script failed:', error);
         process.exit(1);
     });
-
-// 0x61a1d40346bdedf611cd3c89916894c6f8b8d63e,327.63
-// 0xa9597e0dcd1be1c49ed844e1ba288893ccca1327,1979.26
-// 0xe673f5e474dbf76a1230fea52e8e58f4baca151c,3035.47

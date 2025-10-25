@@ -21,12 +21,14 @@ contract Staking is ReentrancyGuard, IStaking {
 
     IERC20 public immutable roomToken;
 
-    uint256 public constant COOLDOWN_PERIOD = 2 weeks;
+    uint256 public constant COOLDOWN_PERIOD = 5 minutes;
     uint256 public nextPositionId = 1;
 
     mapping(uint256 => Position) public positions;
     mapping(address => uint256[]) public userPositions;
     mapping(address => uint256) public totalStaked;
+
+    address[] public stakers;
 
     modifier onlyPositionOwner(uint256 positionId) {
         require(
@@ -56,15 +58,6 @@ contract Staking is ReentrancyGuard, IStaking {
      */
     function stake(uint256 amount) external nonReentrant returns (uint256) {
         require(amount > 0, "Amount must be greater than zero");
-        require(
-            roomToken.balanceOf(msg.sender) >= amount,
-            "Insufficient token balance"
-        );
-        require(
-            roomToken.allowance(msg.sender, address(this)) >= amount,
-            "Insufficient allowance"
-        );
-
         roomToken.safeTransferFrom(msg.sender, address(this), amount);
 
         uint256 positionId = nextPositionId++;
@@ -73,11 +66,14 @@ contract Staking is ReentrancyGuard, IStaking {
             owner: msg.sender,
             amount: amount,
             unlockTime: 0,
+            stakeTime: block.timestamp,
             status: PositionStatus.Active
         });
 
         userPositions[msg.sender].push(positionId);
         totalStaked[msg.sender] += amount;
+
+        stakers.push(msg.sender);
 
         emit PositionCreated(positionId, msg.sender, amount, block.timestamp);
 
@@ -138,9 +134,7 @@ contract Staking is ReentrancyGuard, IStaking {
         );
 
         uint256 amount = position.amount;
-
-        position.amount = 0;
-        position.status = PositionStatus.None;
+        position.status = PositionStatus.Claimed;
 
         roomToken.safeTransfer(msg.sender, amount);
 
@@ -173,15 +167,78 @@ contract Staking is ReentrancyGuard, IStaking {
         emit PositionRestaked(positionId, msg.sender, position.amount);
     }
 
-    /**
-     * @dev Get all position IDs for a user
-     * @param user Address of the user
-     * @return Array of position IDs
-     */
-    function getUserPositions(
-        address user
+    function getAllStakersWithPagination(
+        uint256 offset,
+        uint256 limit
+    ) external view returns (address[] memory) {
+        address[] memory result = new address[](limit);
+
+        for (uint256 i = offset; i < offset + limit; i++) {
+            result[i - offset] = stakers[i];
+        }
+
+        return result;
+    }
+
+    function getAllPositionsByStatusWithPagination(
+        PositionStatus status,
+        uint256 offset,
+        uint256 limit
+    ) external view returns (Position[] memory) {
+        Position[] memory result = new Position[](limit);
+
+        for (uint256 i = offset; i < offset + limit; i++) {
+            Position storage position = positions[i];
+            if (position.status == status) {
+                result[i - offset] = position;
+            }
+        }
+
+        return result;
+    }
+
+    function getAllPositionsWithPagination(
+        uint256 offset,
+        uint256 limit
+    ) external view returns (Position[] memory) {
+        Position[] memory result = new Position[](limit);
+
+        for (uint256 i = offset; i < offset + limit; i++) {
+            result[i - offset] = positions[i];
+        }
+
+        return result;
+    }
+
+    function getUserPositionsPaginated(
+        address user,
+        uint256 offset,
+        uint256 limit
     ) external view returns (uint256[] memory) {
-        return userPositions[user];
+        uint256[] storage allPositions = userPositions[user];
+        uint256 length = allPositions.length;
+
+        if (offset >= length) {
+            return new uint256[](0);
+        }
+
+        uint256 end = offset + limit;
+        if (end > length) {
+            end = length;
+        }
+
+        uint256[] memory result = new uint256[](end - offset);
+        for (uint256 i = offset; i < end; i++) {
+            result[i - offset] = allPositions[i];
+        }
+
+        return result;
+    }
+
+    function getUserPositionCount(
+        address user
+    ) external view returns (uint256) {
+        return userPositions[user].length;
     }
 
     /**
@@ -192,10 +249,6 @@ contract Staking is ReentrancyGuard, IStaking {
     function getPosition(
         uint256 positionId
     ) external view returns (Position memory) {
-        require(
-            positions[positionId].owner != address(0),
-            "Position does not exist"
-        );
         return positions[positionId];
     }
 

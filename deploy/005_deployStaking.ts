@@ -8,7 +8,7 @@ dotenv.config();
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     const { deployments, getNamedAccounts } = hre;
     const { deploy } = deployments;
-    const roomToken = '0x21Cc998e627Ba6c18a134153341A6771996Ef304';
+    const roomToken = '0x809fe0C6acD263C9CF987f3D30aD47Fdc4706e54';
 
     const { deployer } = await getNamedAccounts();
 

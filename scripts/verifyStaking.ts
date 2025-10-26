@@ -5,7 +5,7 @@ import path from 'path';
 
 dotenv.config();
 
-const STAKING_ADDRESS = '0x9eAB79F9d4b3F292A7a585d43a13549E77141B23';
+const BACKROOM_ADDRESS = process.env.BACKROOM_ADDRESS || '';
 
 // Helper function to wait/delay
 const delay = (ms: number): Promise<void> =>
@@ -19,7 +19,7 @@ async function attemptVerification(
         console.log(`\n🔄 Verification attempt ${attempt}/4...`);
 
         await run('verify:verify', {
-            address: STAKING_ADDRESS,
+            address: BACKROOM_ADDRESS,
             constructorArguments: constructorArgs,
         });
 
@@ -37,13 +37,12 @@ async function attemptVerification(
 }
 
 async function main(): Promise<void> {
-    const roomToken = '0x6555255b8ded3c538cb398d9e36769f45d7d3ea7';
-    console.log('Verifying Staking contract...');
+    console.log('Verifying Backroom contract...');
     console.log('=====================================');
 
-    if (!STAKING_ADDRESS) {
-        console.error('❌ STAKING_ADDRESS not found in environment variables');
-        console.log('Please set STAKING_ADDRESS in your .env file');
+    if (!BACKROOM_ADDRESS) {
+        console.error('❌ BACKROOM_ADDRESS not found in environment variables');
+        console.log('Please set BACKROOM_ADDRESS in your .env file');
         process.exit(1);
     }
 
@@ -54,7 +53,7 @@ async function main(): Promise<void> {
         '..',
         'deployments',
         network.chainId === 84532n ? 'baseSepolia' : 'base',
-        'Staking.json'
+        'Backroom.json'
     );
 
     let deploymentData;
@@ -72,6 +71,17 @@ async function main(): Promise<void> {
 
     const constructorArgs = deploymentData.args;
 
+    console.log('Contract address:', BACKROOM_ADDRESS);
+
+    console.log('\nConstructor arguments:');
+    console.log('- Protocol Fee Destination:', constructorArgs[0]);
+    console.log('- Protocol Fee Percent:', constructorArgs[1]);
+    console.log('- Subject Fee Percent:', constructorArgs[2]);
+    console.log('- Token Address:', constructorArgs[3]);
+    console.log('- Divisor 1:', constructorArgs[4]);
+    console.log('- Divisor 2:', constructorArgs[5]);
+    console.log('- Divisor 3:', constructorArgs[6]);
+
     // Retry verification up to 4 times
     const maxAttempts = 4;
     const delayBetweenAttempts = 3000; // 3 seconds
@@ -85,14 +95,14 @@ async function main(): Promise<void> {
 
             if (network.chainId === 8453n) {
                 // Base Mainnet
-                console.log(`https://basescan.org/address/${STAKING_ADDRESS}`);
+                console.log(`https://basescan.org/address/${BACKROOM_ADDRESS}`);
             } else if (network.chainId === 84532n) {
                 // Base Sepolia
                 console.log(
-                    `https://sepolia.basescan.org/address/${STAKING_ADDRESS}`
+                    `https://sepolia.basescan.org/address/${BACKROOM_ADDRESS}`
                 );
             } else {
-                console.log(`Contract address: ${STAKING_ADDRESS}`);
+                console.log(`Contract address: ${BACKROOM_ADDRESS}`);
             }
             return; // Exit successfully
         }
@@ -113,10 +123,10 @@ async function main(): Promise<void> {
     console.log(`2. Use manual verification on Basescan:`);
     if (network.chainId === 84532n) {
         console.log(
-            `   https://sepolia.basescan.org/address/${STAKING_ADDRESS}#code`
+            `   https://sepolia.basescan.org/address/${BACKROOM_ADDRESS}#code`
         );
     } else {
-        console.log(`   https://basescan.org/address/${STAKING_ADDRESS}#code`);
+        console.log(`   https://basescan.org/address/${BACKROOM_ADDRESS}#code`);
     }
     console.log(`3. Check your ETHERSCAN_API_KEY is valid for Basescan`);
 

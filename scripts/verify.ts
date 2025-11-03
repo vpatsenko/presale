@@ -5,7 +5,7 @@ import path from 'path';
 
 dotenv.config();
 
-const STAKING_ADDRESS = '0xCD4819d0D6B87f4572fCE41f8AD22dA42a4c3CA8';
+const STAKING_ADDRESS = '0x34b2Cc9eA1CBCd70227D72f86144f446648cD260';
 
 // Helper function to wait/delay
 const delay = (ms: number): Promise<void> =>

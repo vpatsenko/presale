@@ -21,7 +21,7 @@ contract Staking is ReentrancyGuard, IStaking {
 
     IERC20 public immutable roomToken;
 
-    uint256 public constant COOLDOWN_PERIOD = 2 * 7 * 24 * 3600; // 2 weeks in seconds
+    uint256 public constant COOLDOWN_PERIOD = 1 minutes; // 2 weeks in seconds
     uint256 public nextPositionId = 1;
 
     mapping(uint256 => Position) public positions;
@@ -177,8 +177,9 @@ contract Staking is ReentrancyGuard, IStaking {
     ) external view returns (address[] memory) {
         uint256 stakersLength = stakers.length;
 
+        address[] memory result = new address[](limit);
         if (offset >= stakersLength) {
-            address[] memory result = new address[](limit);
+            result = new address[](limit);
             return result;
         }
 
@@ -187,8 +188,7 @@ contract Staking is ReentrancyGuard, IStaking {
             actualLimit = stakersLength - offset;
         }
 
-        address[] memory result = new address[](actualLimit);
-
+        result = new address[](actualLimit);
         for (uint256 i = 0; i < actualLimit; i++) {
             result[i] = stakers[offset + i];
         }

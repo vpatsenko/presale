@@ -43,4 +43,11 @@ interface IStaking {
         address indexed owner,
         uint256 amount
     );
+
+    /**
+     * @dev Get user's total staked amount
+     * @param user Address of the user
+     * @return Total staked amount
+     */
+    function getUserTotalStaked(address user) external view returns (uint256);
 }

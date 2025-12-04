@@ -215,14 +215,32 @@ contract InvestmentContract is Ownable, ReentrancyGuard, IInvesting {
     }
 
     /**
-     * @dev Get all investors with their complete information
+     * @dev Get all investors with their complete information (paginated)
+     * @param offset Starting index for pagination
+     * @param limit Maximum number of investors to return
      * @return Array of InvestorInfo structs
      */
-    function getAllInvestors() external view returns (InvestorInfo[] memory) {
-        InvestorInfo[] memory result = new InvestorInfo[](investors.length);
+    function getAllInvestors(
+        uint256 offset,
+        uint256 limit
+    ) external view returns (InvestorInfo[] memory) {
+        uint256 investorsLength = investors.length;
 
-        for (uint256 i = 0; i < investors.length; i++) {
-            address investor = investors[i];
+        // If offset is beyond the array length, return empty array
+        if (offset >= investorsLength) {
+            return new InvestorInfo[](0);
+        }
+
+        // Calculate actual limit (don't exceed array bounds)
+        uint256 actualLimit = limit;
+        if (offset + limit > investorsLength) {
+            actualLimit = investorsLength - offset;
+        }
+
+        InvestorInfo[] memory result = new InvestorInfo[](actualLimit);
+
+        for (uint256 i = 0; i < actualLimit; i++) {
+            address investor = investors[offset + i];
             result[i] = InvestorInfo({
                 investor: investor,
                 amountInvested: amountInvested[investor],
@@ -235,55 +253,4 @@ contract InvestmentContract is Ownable, ReentrancyGuard, IInvesting {
         return result;
     }
 
-    /**
-     * @dev Get top investors by amount invested (up to 20)
-     * @return investors_ Array of top investor addresses
-     * @return amountsInvested_ Array of corresponding investment amounts
-     */
-    function getTopInvestors()
-        external
-        view
-        returns (address[] memory investors_, uint256[] memory amountsInvested_)
-    {
-        uint256 count = investors.length;
-        uint256 topCount = count > 20 ? 20 : count;
-
-        // Create arrays for sorting
-        address[] memory sortedInvestors = new address[](count);
-        uint256[] memory sortedAmounts = new uint256[](count);
-
-        // Copy investors and amounts
-        for (uint256 i = 0; i < count; i++) {
-            sortedInvestors[i] = investors[i];
-            sortedAmounts[i] = amountInvested[investors[i]];
-        }
-
-        // Simple bubble sort (descending order)
-        for (uint256 i = 0; i < count; i++) {
-            for (uint256 j = 0; j < count - i - 1; j++) {
-                if (sortedAmounts[j] < sortedAmounts[j + 1]) {
-                    // Swap amounts
-                    uint256 tempAmount = sortedAmounts[j];
-                    sortedAmounts[j] = sortedAmounts[j + 1];
-                    sortedAmounts[j + 1] = tempAmount;
-
-                    // Swap addresses
-                    address tempAddr = sortedInvestors[j];
-                    sortedInvestors[j] = sortedInvestors[j + 1];
-                    sortedInvestors[j + 1] = tempAddr;
-                }
-            }
-        }
-
-        // Return top N
-        investors_ = new address[](topCount);
-        amountsInvested_ = new uint256[](topCount);
-
-        for (uint256 i = 0; i < topCount; i++) {
-            investors_[i] = sortedInvestors[i];
-            amountsInvested_[i] = sortedAmounts[i];
-        }
-
-        return (investors_, amountsInvested_);
-    }
 }

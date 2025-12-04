@@ -257,7 +257,7 @@ describe('InvestmentContract', function () {
             await investmentContract.connect(user2).deposit(depositAmount2);
             await investmentContract.connect(user3).deposit(depositAmount3);
 
-            const investors = await investmentContract.getAllInvestors();
+            const investors = await investmentContract.getAllInvestors(0, 100);
             expect(investors.length).to.equal(3);
             expect(investors[0].investor).to.equal(user1.address);
             expect(investors[1].investor).to.equal(user2.address);
@@ -601,7 +601,7 @@ describe('InvestmentContract', function () {
                 usdcRefunds
             );
 
-            const investors = await investmentContract.getAllInvestors();
+            const investors = await investmentContract.getAllInvestors(0, 100);
 
             expect(investors.length).to.equal(2);
             expect(investors[0].investor).to.equal(user1.address);
@@ -695,6 +695,112 @@ describe('InvestmentContract', function () {
                 ethers.parseUnits('100', 18)
             );
             expect(await investmentContract.tokenAllocation(user2.address)).to.equal(0);
+        });
+    });
+
+    describe('Pagination', function () {
+        beforeEach(async function () {
+            await investmentContract.startSale();
+
+            // Create multiple investors
+            await usdcToken.connect(user1).approve(
+                await investmentContract.getAddress(),
+                depositAmount1
+            );
+            await usdcToken.connect(user2).approve(
+                await investmentContract.getAddress(),
+                depositAmount2
+            );
+            await usdcToken.connect(user3).approve(
+                await investmentContract.getAddress(),
+                depositAmount3
+            );
+
+            await investmentContract.connect(user1).deposit(depositAmount1);
+            await investmentContract.connect(user2).deposit(depositAmount2);
+            await investmentContract.connect(user3).deposit(depositAmount3);
+        });
+
+        it('Should return paginated investors with offset and limit', async function () {
+            const investors = await investmentContract.getAllInvestors(0, 2);
+
+            expect(investors.length).to.equal(2);
+            expect(investors[0].investor).to.equal(user1.address);
+            expect(investors[1].investor).to.equal(user2.address);
+        });
+
+        it('Should return remaining investors when limit exceeds available', async function () {
+            const investors = await investmentContract.getAllInvestors(0, 10);
+
+            expect(investors.length).to.equal(3);
+            expect(investors[0].investor).to.equal(user1.address);
+            expect(investors[1].investor).to.equal(user2.address);
+            expect(investors[2].investor).to.equal(user3.address);
+        });
+
+        it('Should return empty array when offset exceeds total investors', async function () {
+            const investors = await investmentContract.getAllInvestors(10, 5);
+
+            expect(investors.length).to.equal(0);
+        });
+
+        it('Should return correct investors with offset', async function () {
+            const investors = await investmentContract.getAllInvestors(1, 2);
+
+            expect(investors.length).to.equal(2);
+            expect(investors[0].investor).to.equal(user2.address);
+            expect(investors[1].investor).to.equal(user3.address);
+        });
+
+        it('Should return partial results when offset + limit exceeds total', async function () {
+            const investors = await investmentContract.getAllInvestors(2, 5);
+
+            expect(investors.length).to.equal(1);
+            expect(investors[0].investor).to.equal(user3.address);
+        });
+
+        it('Should handle zero limit', async function () {
+            const investors = await investmentContract.getAllInvestors(0, 0);
+
+            expect(investors.length).to.equal(0);
+        });
+
+        it('Should return all investors when using large limit', async function () {
+            const investors = await investmentContract.getAllInvestors(0, 1000);
+
+            expect(investors.length).to.equal(3);
+            expect(investors[0].investor).to.equal(user1.address);
+            expect(investors[1].investor).to.equal(user2.address);
+            expect(investors[2].investor).to.equal(user3.address);
+        });
+
+        it('Should maintain correct data structure in paginated results', async function () {
+            // Set allocations first
+            const addresses = [user1.address, user2.address, user3.address];
+            const tokenAllocations = [
+                ethers.parseUnits('100', 18),
+                ethers.parseUnits('50', 18),
+                ethers.parseUnits('200', 18),
+            ];
+            const usdcRefunds = [
+                ethers.parseUnits('0', 6),
+                ethers.parseUnits('100', 6),
+                ethers.parseUnits('0', 6),
+            ];
+
+            await investmentContract.setAllocations(
+                addresses,
+                tokenAllocations,
+                usdcRefunds
+            );
+
+            const investors = await investmentContract.getAllInvestors(1, 1);
+
+            expect(investors.length).to.equal(1);
+            expect(investors[0].investor).to.equal(user2.address);
+            expect(investors[0].amountInvested).to.equal(depositAmount2);
+            expect(investors[0].tokenAllocation).to.equal(tokenAllocations[1]);
+            expect(investors[0].usdcRefund).to.equal(usdcRefunds[1]);
         });
     });
 });

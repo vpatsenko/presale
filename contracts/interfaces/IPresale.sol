@@ -78,7 +78,6 @@ interface IPresale {
         view
         returns (
             bool _saleFinalized,
-            bool _saleSuccessful,
             uint256 _totalRaised,
             uint256 _startTime,
             uint256 _endTime
@@ -99,17 +98,6 @@ interface IPresale {
      * @return Time remaining in seconds (0 if sale not started or ended)
      */
     function getTimeRemaining() external view returns (uint256);
-
-    /**
-     * @dev Calculate simple proportional token allocation (legacy function)
-     * @param _contributor Address to calculate for
-     * @param _totalTokensAllocated Total tokens allocated to presale
-     * @return Allocation amount based on proportional contribution
-     */
-    function calculateTokenAllocation(
-        address _contributor,
-        uint256 _totalTokensAllocated
-    ) external view returns (uint256);
 
     // ============================================
     // Allocation Management

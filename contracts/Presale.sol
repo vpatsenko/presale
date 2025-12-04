@@ -172,7 +172,7 @@ contract Presale is IPresale, Ownable, ReentrancyGuard {
 
         saleFinalized = true;
 
-        emit SaleFinalized(totalRaised);
+        emit SaleFinalized(true, totalRaised);
     }
 
     /**
@@ -327,11 +327,6 @@ contract Presale is IPresale, Ownable, ReentrancyGuard {
 
         // Final allocation: A_i = (C_i / R_i) * K
         uint256 allocation = (CiDivRi * normalizationFactor) / SCALE;
-
-        // Cap at commitment (should never exceed, but safety check)
-        if (allocation > commitment) {
-            allocation = commitment;
-        }
 
         return allocation;
     }

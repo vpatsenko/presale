@@ -44,11 +44,8 @@ interface IStaking {
         uint256 amount
     );
 
-    function roomToken() external view returns (address);
     function COOLDOWN_PERIOD() external view returns (uint256);
     function nextPositionId() external view returns (uint256);
-    function positions(uint256 positionId) external view returns (Position memory);
-    function userPositions(address user) external view returns (uint256[] memory);
     function totalStaked(address user) external view returns (uint256);
     function stakers(uint256 index) external view returns (address);
     function isRegistered(address user) external view returns (bool);

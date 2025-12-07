@@ -182,7 +182,9 @@ async function verifyDeployment(
         console.log(`   Owner: ${owner}`);
         console.log(`   USDC Token: ${usdcAddress}`);
         console.log(`   Staking Contract: ${stakingAddress}`);
-        console.log(`   Sale Duration: ${saleDuration.toString()} seconds (${formatDuration(Number(saleDuration))})`);
+        console.log(
+            `   Sale Duration: ${saleDuration.toString()} seconds (${formatDuration(Number(saleDuration))})`
+        );
 
         // Validate deployed values
         const mismatches: string[] = [];
@@ -197,7 +199,9 @@ async function verifyDeployment(
         }
 
         if (mismatches.length > 0) {
-            console.warn(`\n⚠️  Warning: Parameter mismatches detected: ${mismatches.join(', ')}`);
+            console.warn(
+                `\n⚠️  Warning: Parameter mismatches detected: ${mismatches.join(', ')}`
+            );
         } else {
             console.log('\n✅ All parameters verified successfully!');
         }
@@ -236,13 +240,19 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     console.log('📋 Deployment Parameters:');
     console.log(`   USDC Token: ${CONFIG.USDC_ADDRESS}`);
     console.log(`   Staking Contract: ${CONFIG.STAKING_ADDRESS}`);
-    console.log(`   Sale Duration: ${CONFIG.SALE_DURATION} seconds (${formatDuration(CONFIG.SALE_DURATION)})\n`);
+    console.log(
+        `   Sale Duration: ${CONFIG.SALE_DURATION} seconds (${formatDuration(CONFIG.SALE_DURATION)})\n`
+    );
 
     // Deploy contract
     console.log('📦 Deploying contract...');
     const deployment = await deploy('InvestmentContract', {
         from: deployer,
-        args: [CONFIG.USDC_ADDRESS, CONFIG.STAKING_ADDRESS, CONFIG.SALE_DURATION],
+        args: [
+            CONFIG.USDC_ADDRESS,
+            CONFIG.STAKING_ADDRESS,
+            CONFIG.SALE_DURATION,
+        ],
         log: false, // We'll handle logging ourselves
         waitConfirmations: 1,
     });
@@ -282,7 +292,11 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
             CONFIG.STAKING_ADDRESS,
             CONFIG.SALE_DURATION,
         ];
-        await verifyContract(deployment.address, constructorArgs, network.chainId);
+        await verifyContract(
+            deployment.address,
+            constructorArgs,
+            network.chainId
+        );
     } else {
         console.log('\n⏭️  Skipping explorer verification (local network)');
     }
@@ -291,7 +305,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     console.log('\n💡 Next Steps:');
     console.log('   1. Call startSale() to begin the investment period');
     console.log('   2. Users can deposit USDC during the sale period');
-    console.log('   3. After sale ends, call setAllocations() to set final allocations');
+    console.log(
+        '   3. After sale ends, call setAllocations() to set final allocations'
+    );
     console.log('   4. Call withdrawFunds() to withdraw collected USDC');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 };

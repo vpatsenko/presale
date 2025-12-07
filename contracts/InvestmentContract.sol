@@ -127,7 +127,6 @@ contract InvestmentContract is Ownable, ReentrancyGuard, IInvesting {
 
         for (uint256 i = 0; i < _addresses.length; i++) {
             require(_addresses[i] != address(0), "Invalid address");
-            require(amountInvested[_addresses[i]] > 0, "Address did not invest");
 
             tokenAllocation[_addresses[i]] = _tokenAllocations[i];
             usdcRefund[_addresses[i]] = _usdcRefunds[i];
@@ -197,11 +196,7 @@ contract InvestmentContract is Ownable, ReentrancyGuard, IInvesting {
     function getSaleTimes()
         external
         view
-        returns (
-            uint256 saleStart_,
-            uint256 saleEnd_,
-            uint256 saleDuration_
-        )
+        returns (uint256 saleStart_, uint256 saleEnd_, uint256 saleDuration_)
     {
         return (saleStart, saleEnd, saleDuration);
     }
@@ -211,7 +206,10 @@ contract InvestmentContract is Ownable, ReentrancyGuard, IInvesting {
      * @return true if sale is active, false otherwise
      */
     function isSaleActive() external view returns (bool) {
-        return saleStart > 0 && block.timestamp >= saleStart && block.timestamp <= saleEnd;
+        return
+            saleStart > 0 &&
+            block.timestamp >= saleStart &&
+            block.timestamp <= saleEnd;
     }
 
     /**
@@ -252,5 +250,4 @@ contract InvestmentContract is Ownable, ReentrancyGuard, IInvesting {
 
         return result;
     }
-
 }

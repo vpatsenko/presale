@@ -7,9 +7,9 @@ import { run } from 'hardhat';
 // Deployment Configuration
 // ============================================================================
 const CONFIG = {
-    USDC_ADDRESS: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-    STAKING_ADDRESS: '0x34b2Cc9eA1CBCd70227D72f86144f446648cD260',
-    SALE_DURATION: 5 * 60, // 5 minutes in seconds
+    USDC_ADDRESS: '0xEEec074eD8F45c0E553DD34280c6030b34ddAca5',
+    STAKING_ADDRESS: '0x266Da9B9064803dEd6fE3FEeF0417A4f2a7e0c8E',
+    SALE_DURATION: 2 * 60 * 60, // 2 hours in seconds
 } as const;
 
 // ============================================================================
